@@ -18,5 +18,5 @@ To get new lists: `git pull`, then reload. New lists are added automatically.
 
 ## Lists
 
-`listen/*.txt` holds one pair per line: `German = translation`. The separator can be tab, `=`, `;` or ` - `. Use `/` for several correct answers. Put the words in order from easy to hard, since new words are introduced in file order.
+`listen/*.txt` holds one pair per line: `prompt = translation` (the prompt is German by default; a bundled list can set `from: "zh"` etc.). The separator can be tab, `=`, `;` or ` - `. Use `/` for several correct answers. Put the words in order from easy to hard, since new words are introduced in file order.
 To bundle a list, add it to the `BUNDLED` array in `index.html`. You can also import your own lists in the app.

@@ -162,7 +162,7 @@
 <!-- ======================= HOME ======================= -->
 <section id="home">
   <h1>Vocab Trainer</h1>
-  <p class="sub">See the German, type the translation, fix mistakes on the spot.</p>
+  <p class="sub">See the word, type the translation, fix mistakes on the spot.</p>
 
   <h2>My lists</h2>
   <div id="deckList"></div>
@@ -212,7 +212,7 @@
   <div class="roundline" id="roundline"></div>
 
   <div class="card" id="card">
-    <div class="qlabel">German<span class="tag hidden" id="revTag">Review</span></div>
+    <div class="qlabel"><span id="qlang">German</span><span class="tag hidden" id="revTag">Review</span></div>
     <div class="qword" id="qword"></div>
 
     <input type="text" id="answer" autocomplete="off" autocorrect="off" autocapitalize="off"
@@ -274,6 +274,8 @@ const GAP_ERR      = [2, 4];  // cards until it comes back after a mistake / typ
 
 /* ============================ Languages ============================ */
 const LANGS = {
+  de: { name: "German",     chars: ["ä","ö","ü","Ä","Ö","Ü"] },
+  zh: { name: "Chinese",    chars: [] },
   pt: { name: "Portuguese", chars: ["á","â","ã","à","é","ê","í","ó","ô","õ","ú","ç"] },
   fr: { name: "French",     chars: ["é","è","ê","ë","à","â","ù","û","ü","î","ï","ô","ö","ç","œ","'"] },
   es: { name: "Spanish",    chars: ["á","é","í","ó","ú","ñ","ü","¿","¡"] },
@@ -287,7 +289,10 @@ const langName = code => (LANGS[code] || LANGS.xx).name;
 const BUNDLED = [
   { file: "listen/portugiesisch-150.txt", lang: "pt",
     name: "Portuguese (BR) – the 150 most important words",
-    oldNames: ["Portugiesisch (BR) – die 150 wichtigsten Wörter"] }
+    oldNames: ["Portugiesisch (BR) – die 150 wichtigsten Wörter"] },
+  { file: "listen/deutsch-schweiz-150.txt", lang: "de", from: "zh",
+    name: "Deutsch (Schweiz) – 150 Grundwörter · 瑞士德语基础词汇",
+    oldNames: [] }
 ];
 
 /* ============================ Storage ============================ */
@@ -521,6 +526,7 @@ function autoAddBundled() {
         if (!pairs.length) return;
         const d = mkDeck(db.nextId++, b.name, b.lang, pairs.map(x => [x.de, x.a]));
         d.src = b.file;
+        if (b.from) d.from = b.from;
         db.decks.push(d);
         db.autoAdded.push(b.file);
         save();
@@ -744,6 +750,7 @@ function importFile() {
 /* ================= Grading: typos, accents, alternatives ================= */
 function norm(s) {
   return s.toLowerCase()
+    .replace(/ß/g, "ss")
     .replace(/[‘’´`]/g, "'")
     .replace(/\s+/g, " ")
     .replace(/[.!?]+$/g, "")
@@ -891,6 +898,7 @@ function startSession(deckId, onlyCards) {
     phase: "idle"
   };
   buildAccents(d.lang);
+  $("qlang").textContent = langName(d.from || "de");   // prompt side: German unless the list says otherwise
   answerEl.placeholder = "type in " + langName(d.lang) + " …";
   go("study");
   startRound([]);
@@ -1305,7 +1313,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") quitStudy();
 });
 
-const VERSION = "v17 · 2026-09-24";
+const VERSION = "v18 · 2026-09-24";
 $("version").textContent =
   VERSION + " — if you see something else here, your browser is still on the old page (reload).";
 $("rules").textContent =
