@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10141a">
+<meta http-equiv="Cache-Control" content="no-cache">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Vocab Trainer</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; -webkit-tap-highlight-color: transparent; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #10141a; color: #e6e9ee;
+    max-width: 760px; margin: 0 auto; min-height: 100svh;
+    padding: 1.6rem max(1rem, env(safe-area-inset-left)) calc(3rem + env(safe-area-inset-bottom));
+  }
+  h1 { font-size: 1.3rem; font-weight: 600; }
+  h2 { font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #8a93a3; margin: 1.6rem 0 .6rem; }
+  p.sub { color: #8a93a3; font-size: .85rem; margin-top: .25rem; }
+  code { background: #1a2029; border-radius: 4px; padding: .05rem .3rem; font-size: .85em; }
+  button {
+    font: inherit; cursor: pointer; border-radius: 9px; border: 1px solid #2c3542;
+    background: #1a2029; color: #e6e9ee; padding: .55rem .9rem; min-height: 44px;
+    touch-action: manipulation; transition: background .12s, border-color .12s;
+  }
+  button:hover { background: #222b36; border-color: #3c4757; }
+  button.primary { background: #2f6fb5; border-color: #2f6fb5; color: #fff; font-weight: 500; }
+  button.primary:hover { background: #3a80cc; border-color: #3a80cc; }
+  button.ghost { background: transparent; border-color: transparent; color: #8a93a3; }
+  button.ghost:hover { color: #e6e9ee; background: #1a2029; }
+  button.danger:hover { border-color: #d95f4a; color: #ff8b76; }
+  select {
+    font: inherit; background: #141920; color: #e6e9ee; border: 1px solid #2c3542;
+    border-radius: 9px; padding: .5rem .6rem;
+  }
+  .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+  .spacer { flex: 1; }
+  .hidden { display: none !important; }
+
+  .deck {
+    display: flex; align-items: center; gap: .8rem;
+    background: #1a2029; border: 1px solid #262e3a; border-radius: 11px;
+    padding: .85rem 1rem; margin-bottom: .6rem;
+  }
+  .deck .deckmain { min-width: 0; flex: 1; }
+  .deck .name { font-size: 1rem; font-weight: 500; }
+  .deck .hint { font-size: .74rem; color: #8a93a3; margin-top: .15rem; }
+  .bar {
+    display: flex; height: 8px; background: #262e3a; border-radius: 4px;
+    overflow: hidden; margin-top: .5rem; width: 100%;
+  }
+  .bar > i { display: block; height: 100%; transition: width .35s; }
+  .bar > i.g { background: #3fb96b; }
+  .bar > i.y { background: #d9a441; }
+  .bar > i.r { background: #8f4340; }
+  .legend { font-size: .72rem; margin-top: .4rem; display: flex; gap: .7rem; flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: .3rem; color: #8a93a3; }
+  .legend i { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
+  .legend .g i { background: #3fb96b; } .legend .g { color: #7fd39b; }
+  .legend .y i { background: #d9a441; } .legend .y { color: #e0bb72; }
+  .legend .r i { background: #8f4340; }
+
+  textarea, input[type=text] {
+    font: inherit; width: 100%; background: #141920; color: #e6e9ee;
+    border: 1px solid #2c3542; border-radius: 9px; padding: .7rem .85rem;
+  }
+  textarea { min-height: 240px; resize: vertical; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85rem; line-height: 1.5; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: #4a90d9; }
+
+  .topbar { display: flex; align-items: center; gap: .8rem; margin-bottom: .5rem; }
+  .prog { flex: 1; height: 6px; background: #1e242d; border-radius: 4px; overflow: hidden; }
+  .prog > i { display: block; height: 100%; background: #2f6fb5; width: 0; transition: width .25s; }
+  .counter { font-size: .78rem; color: #8a93a3; font-variant-numeric: tabular-nums; }
+  .roundline { font-size: .74rem; color: #6f7888; margin-bottom: 1.1rem; }
+
+  .card {
+    background: #1a2029; border: 1px solid #262e3a; border-radius: 14px;
+    padding: 1.6rem 1.3rem 1.3rem;
+  }
+  .card.ok { border-color: #3fb96b; }
+  .card.typo { border-color: #d9a441; }
+  .card.bad { border-color: #d95f4a; }
+  .qlabel { font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; color: #8a93a3; }
+  .qlabel .tag { color: #7c8ba0; background: #232c37; border-radius: 4px; padding: .1rem .4rem; margin-left: .4rem; letter-spacing: .04em; }
+  .qword { font-size: 2rem; font-weight: 600; margin: .35rem 0 1.4rem; line-height: 1.2; word-break: break-word; }
+  #answer { font-size: 1.15rem; padding: .75rem .9rem; }
+  #answer.shake { animation: shake .3s; }
+  @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+  .accents { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .55rem; }
+  .accents button {
+    padding: .3rem; font-size: 1.05rem; background: #141920;
+    min-width: 2.5rem; min-height: 2.5rem; flex: none;
+  }
+
+  .fb { margin-top: 1.1rem; font-size: .95rem; line-height: 1.55; }
+  .fb .head { font-weight: 600; margin-bottom: .25rem; }
+  .fb.ok .head { color: #3fb96b; }
+  .fb.typo .head { color: #d9a441; }
+  .fb.bad .head { color: #ff8b76; }
+  .fb .sol { font-size: 1.25rem; font-weight: 600; color: #fff; }
+  .fb .yours { color: #8a93a3; font-size: .85rem; margin-top: .25rem; }
+  .diff-ok { color: #9fb0c4; }
+  .diff-bad { color: #ff8b76; text-decoration: line-through; }
+  .hintline { font-size: .75rem; color: #6f7888; margin-top: .9rem; }
+  kbd { background: #262e3a; border-radius: 4px; padding: .05rem .3rem; font-size: .72rem; font-family: inherit; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .6rem; margin: 1.1rem 0; }
+  .tile { background: #1a2029; border: 1px solid #262e3a; border-radius: 11px; padding: .75rem .9rem; }
+  .tile b { display: block; font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tile small { color: #8a93a3; font-size: .73rem; }
+  .tile.good b { color: #3fb96b; }
+  .tile.warn b { color: #d9a441; }
+  .tile.bad b { color: #ff8b76; }
+
+  table.words { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  table.words td { padding: .35rem 0; border-bottom: 1px solid #1e242d; }
+  table.words td.de { color: #b9c1cd; }
+  table.words td.t { color: #fff; font-weight: 500; }
+  table.words td.n { text-align: right; color: #8a93a3; font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: .5rem; }
+  table.words td.n.ok { color: #5f6b7a; }
+  table.words td.n.typo { color: #d9a441; }
+  table.words td.n.bad { color: #ff8b76; }
+  table.words td.lvl { text-align: right; letter-spacing: .1em; white-space: nowrap; padding-left: .6rem; font-size: .78rem; }
+  table.words td.lvl .on { color: #4a90d9; }
+  table.words td.lvl .off { color: #2c3542; }
+  table.words td.lvl.full .on { color: #3fb96b; }
+  #progGroups h2 { margin-top: 1.5rem; }
+
+  /* ---------------- phone ---------------- */
+  @media (max-width: 600px) {
+    body { padding-top: 1.1rem; }
+    h1 { font-size: 1.2rem; }
+    .deck { flex-wrap: wrap; padding: .8rem .85rem; }
+    .deck .deckmain { flex: 1 1 100%; }
+    .deck .name { font-size: .95rem; }
+    .deck button { flex: 1 1 0; }
+    .bar { width: 100%; max-width: none; }
+    .card { padding: 1.1rem .95rem 1rem; }
+    .qword { font-size: 1.7rem; margin-bottom: 1rem; }
+    #answer { font-size: 1.05rem; }          /* must stay >= 16px or iOS zooms in on focus */
+    /* one scrollable row instead of two – saves space next to the keyboard */
+    .accents { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .accents::-webkit-scrollbar { display: none; }
+    .stats { grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .tile { padding: .6rem .7rem; }
+    .tile b { font-size: 1.3rem; }
+    table.words { font-size: .84rem; }
+    table.words td.t { font-size: .9rem; }
+    #sumButtons button, #progButtons button { flex: 1 1 100%; }
+    textarea { min-height: 200px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ======================= HOME ======================= -->
+<section id="home">
+  <h1>Vocab Trainer</h1>
+  <p class="sub">See the German, type the translation, fix mistakes on the spot.</p>
+
+  <h2>My lists</h2>
+  <div id="deckList"></div>
+
+  <div class="row" style="margin-top:.8rem">
+    <button class="primary" onclick="newDeck()">+ New list</button>
+    <button onclick="importFile()">Import file</button>
+    <input type="file" id="fileInput" accept=".txt,.csv,.tsv" class="hidden">
+  </div>
+  <p class="hintline" id="rules"></p>
+  <p class="hintline">Progress is stored on the home server and cached in this browser, so phone and desktop see the same state. Back up a list via Edit → Export.</p>
+  <p class="hintline" id="sync"></p>
+  <p class="hintline" id="version"></p>
+</section>
+
+<!-- ======================= EDITOR ======================= -->
+<section id="edit" class="hidden">
+  <button class="ghost" onclick="go('home')">← back</button>
+  <h2 style="margin-top:1rem">Edit list</h2>
+  <div class="row" style="margin-bottom:.8rem">
+    <input type="text" id="deckName" placeholder="List name" style="flex:1;min-width:200px;width:auto">
+    <select id="deckLang"></select>
+  </div>
+  <p class="sub" style="margin-bottom:.5rem">
+    One entry per line: <b>German</b> &nbsp;separator&nbsp; <b>translation</b>.
+    Allowed separators: tab, <code>=</code>, <code>;</code>, or <code>-</code> with spaces around it.
+    Several valid answers: separate them with <code>/</code>.
+  </p>
+  <textarea id="deckText" spellcheck="false" placeholder="der Hund = o cachorro"></textarea>
+  <div class="row" style="margin-top:.8rem">
+    <button class="primary" onclick="saveDeck()">Save</button>
+    <button onclick="exportDeck()">Export</button>
+    <button onclick="resetProgress()">Reset progress</button>
+    <span class="spacer"></span>
+    <button class="danger" onclick="deleteDeck()">Delete list</button>
+  </div>
+  <p class="hintline" id="editInfo"></p>
+</section>
+
+<!-- ======================= STUDY ======================= -->
+<section id="study" class="hidden">
+  <div class="topbar">
+    <button class="ghost" onclick="quitStudy()" title="Back to overview (Esc)">←</button>
+    <div class="prog"><i id="progBar"></i></div>
+    <div class="counter" id="counter"></div>
+  </div>
+  <div class="roundline" id="roundline"></div>
+
+  <div class="card" id="card">
+    <div class="qlabel">German<span class="tag hidden" id="revTag">Review</span></div>
+    <div class="qword" id="qword"></div>
+
+    <input type="text" id="answer" autocomplete="off" autocorrect="off" autocapitalize="off"
+           spellcheck="false" enterkeyhint="go" placeholder="type your answer …">
+
+    <div class="accents" id="accents"></div>
+    <div class="fb hidden" id="fb"></div>
+
+    <div class="row" style="margin-top:1.1rem">
+      <button class="primary" id="mainBtn">Check</button>
+      <button class="ghost" id="dunnoBtn">I don't know</button>
+      <button id="okBtn" class="hidden">Was right</button>
+    </div>
+    <p class="hintline" id="hintline"><kbd>Enter</kbd> to check</p>
+  </div>
+</section>
+
+<!-- ======================= PROGRESS ======================= -->
+<section id="prog" class="hidden">
+  <button class="ghost" onclick="go('home')">← back</button>
+  <h1 id="progTitle" style="margin-top:.8rem"></h1>
+  <p class="sub" id="progSub"></p>
+  <div id="progBarWrap"></div>
+  <div class="stats" id="progStats"></div>
+  <div class="row" id="progButtons"></div>
+  <p class="hintline">Dots = level 0–5 (each clean answer moves a word up one level, each mistake down one) · right column: correct / total answers</p>
+  <div id="progGroups"></div>
+</section>
+
+<!-- ======================= SECTION / RUN SUMMARY ======================= -->
+<section id="sum" class="hidden">
+  <h1 id="sumTitle"></h1>
+  <p class="sub" id="sumSub"></p>
+  <div class="stats" id="sumStats"></div>
+  <div id="sumWordsWrap" class="hidden">
+    <h2 id="sumWordsTitle"></h2>
+    <table class="words"><tbody id="sumWords"></tbody></table>
+  </div>
+  <div class="row" style="margin-top:1.4rem" id="sumButtons"></div>
+</section>
+
+<script>
+/* =========================================================================
+   Learning parameters
+   Quizlet-Learn principle + what the research says:
+     - small sections instead of the whole list at once
+     - right on the first try = done for this run; anything missed needs
+       two correct answers WITH spacing in between
+     - once 80% of a section sits (mastery criterion) new words come in
+     - words that took effort get mixed back into later sections
+   ========================================================================= */
+const ROUND_NEW    = 7;    // new words per section
+const ROUND_REVIEW = 3;    // review words mixed in from earlier in the run
+const NEED_NEW     = 2;    // correct answers before a new word counts as learned
+const NEED_REVIEW  = 1;    // correct answers for a review word
+const MASTERY      = 0.8;  // share of the section that must sit before it closes
+const GAP_OK       = [4, 6];  // cards until a word comes back after a correct answer
+const GAP_ERR      = [2, 4];  // cards until it comes back after a mistake / typo
+
+/* ============================ Languages ============================ */
+const LANGS = {
+  pt: { name: "Portuguese", chars: ["á","â","ã","à","é","ê","í","ó","ô","õ","ú","ç"] },
+  fr: { name: "French",     chars: ["é","è","ê","ë","à","â","ù","û","ü","î","ï","ô","ö","ç","œ","'"] },
+  es: { name: "Spanish",    chars: ["á","é","í","ó","ú","ñ","ü","¿","¡"] },
+  it: { name: "Italian",    chars: ["à","è","é","ì","ò","ù"] },
+  en: { name: "English",    chars: [] },
+  xx: { name: "Other",      chars: [] }
+};
+const langName = code => (LANGS[code] || LANGS.xx).name;
+
+/* ============================ Bundled lists ============================ */
+const BUNDLED = [
+  { file: "listen/portugiesisch-150.txt", lang: "pt",
+    name: "Portuguese (BR) – the 150 most important words",
+    oldNames: ["Portugiesisch (BR) – die 150 wichtigsten Wörter"] }
+];
+
+/* ============================ Storage ============================ */
+const KEY = "vokabeltrainer.v1";
+let db = load();
+
+function load() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!d || !Array.isArray(d.decks)) d = { decks: [], nextId: 1, updatedAt: 0 };
+  d.updatedAt = d.updatedAt || 0;
+  d.decks.forEach(deck => {
+    if (!deck.lang) deck.lang = "fr";
+    // bundled decks are tracked by source file so renaming them stays safe
+    BUNDLED.forEach(b => {
+      if (!deck.src && (deck.name === b.name || b.oldNames.indexOf(deck.name) >= 0)) deck.src = b.file;
+      if (deck.src === b.file && b.oldNames.indexOf(deck.name) >= 0) deck.name = b.name;
+    });
+    deck.cards.forEach(c => {
+      if (c.a === undefined) c.a = c.fr;   // migration from the very first version
+      delete c.fr;
+      c.lvl = c.lvl || 0; c.seen = c.seen || 0; c.ok = c.ok || 0; c.bad = c.bad || 0;
+      // pre-sync data has no per-card stamp: give practised words one so an
+      // untouched copy elsewhere can never win over them
+      if (!c.t) c.t = c.seen ? 1 : 0;
+    });
+  });
+  return d;
+}
+function save() {
+  db.updatedAt = Date.now();
+  localStorage.setItem(KEY, JSON.stringify(db));
+  schedulePush();
+}
+
+/* ============================ Server sync ============================
+   One user, several devices. Every sync is a full reconcile:
+   GET the server copy → merge it into the local data word by word (the
+   record with the newer per-card stamp wins, otherwise the one with more
+   attempts) → PUT the merged result. The merge is done in place, so a
+   running session keeps its card objects and just sees updated counters. */
+// Sync only runs on the home server (tailnet host). Anywhere else – a local
+// copy, GitHub Pages – progress simply stays in this browser's localStorage.
+const API = /^100\.|\.ts\.net$/.test(location.hostname)
+  ? location.protocol + "//" + location.hostname + ":3010" : null;
+let pushTimer = null, syncing = false, syncAgain = false, syncState = { status: "idle", at: 0 };
+
+function setSync(status) {
+  syncState = { status: status, at: Date.now() };
+  renderSync();
+}
+function renderSync() {
+  const el = $("sync");
+  if (!el) return;
+  const t = new Date(syncState.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  el.textContent = ({
+    idle:    "",
+    syncing: "Syncing with the server …",
+    synced:  "Progress synced with the server · " + t,
+    offline: "Server unreachable — progress is only saved in this browser (" + t + ")"
+  })[syncState.status] || "";
+  el.style.color = syncState.status === "offline" ? "#e0bb72" : "";
+}
+function touch(c) { c.t = Date.now(); }
+function cardKey(c) { return c.de + "|" + c.a; }
+function deckMatch(a, b) { return (a.src && a.src === b.src) || a.name === b.name; }
+function newer(rc, lc) {
+  if ((rc.t || 0) !== (lc.t || 0)) return (rc.t || 0) > (lc.t || 0);
+  return (rc.seen || 0) > (lc.seen || 0);
+}
+/* merge the remote db into the local one; returns true if local changed */
+function mergeInto(local, remote) {
+  let changed = false;
+  (remote.decks || []).forEach(rd => {
+    const ld = local.decks.find(d => deckMatch(d, rd));
+    if (!ld) {
+      const copy = JSON.parse(JSON.stringify(rd));
+      copy.id = local.nextId++;
+      local.decks.push(copy);
+      changed = true;
+      return;
+    }
+    (rd.cards || []).forEach(rc => {
+      const lc = ld.cards.find(c => cardKey(c) === cardKey(rc));
+      if (!lc) {
+        ld.cards.push({ id: ld.nextCard++, de: rc.de, a: rc.a, lvl: rc.lvl || 0, seen: rc.seen || 0,
+                        ok: rc.ok || 0, bad: rc.bad || 0, t: rc.t || 0 });
+        changed = true;
+      } else if (newer(rc, lc)) {
+        lc.lvl = rc.lvl || 0; lc.seen = rc.seen || 0; lc.ok = rc.ok || 0; lc.bad = rc.bad || 0; lc.t = rc.t || 0;
+        changed = true;
+      }
+    });
+  });
+  (remote.autoAdded || []).forEach(f => {
+    if (!Array.isArray(local.autoAdded)) local.autoAdded = [];
+    if (local.autoAdded.indexOf(f) < 0) { local.autoAdded.push(f); changed = true; }
+  });
+  return changed;
+}
+function schedulePush() {
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(syncNow, 800);
+}
+function syncNow(keepalive) {
+  clearTimeout(pushTimer);
+  if (!API) return Promise.resolve();
+  if (syncing) { syncAgain = true; return Promise.resolve(); }
+  syncing = true;
+  setSync("syncing");
+  return fetch(API + "/state", { cache: "no-store" })
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(remote => {
+      let changed = false;
+      if (remote && remote.db && Array.isArray(remote.db.decks)) {
+        changed = mergeInto(db, remote.db);
+        if (changed) {
+          localStorage.setItem(KEY, JSON.stringify(db));
+          if (!$("home").classList.contains("hidden")) renderHome();
+        }
+      }
+      db.updatedAt = Date.now();
+      localStorage.setItem(KEY, JSON.stringify(db));
+      return fetch(API + "/state", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updatedAt: db.updatedAt, db: db }), keepalive: !!keepalive
+      });
+    })
+    .then(r => {
+      if (r.status === 409) { syncAgain = true; return; }   // someone wrote in between → reconcile again
+      if (!r.ok) throw new Error(r.status);
+      setSync("synced");
+    })
+    .catch(() => setSync("offline"))
+    .then(() => {
+      syncing = false;
+      if (syncAgain) { syncAgain = false; return syncNow(); }
+    });
+}
+const pullNow = syncNow;
+// flush when the tab goes to the background, reconcile when it comes back
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") { if (pushTimer) syncNow(true); }
+  else syncNow();
+});
+function deckById(id) { return db.decks.find(d => d.id === id); }
+
+function mkDeck(id, name, lang, pairs) {
+  return {
+    id: id, name: name, lang: lang, nextCard: pairs.length + 1,
+    cards: pairs.map((p, i) => ({ id: i + 1, de: p[0], a: p[1], lvl: 0, seen: 0, ok: 0, bad: 0 }))
+  };
+}
+
+/* ============================ Navigation ============================ */
+function go(name) {
+  ["home", "edit", "study", "sum", "prog"].forEach(s =>
+    document.getElementById(s).classList.toggle("hidden", s !== name));
+  if (name === "home") renderHome();
+  window.scrollTo(0, 0);
+}
+
+/* ============================ Deck list ============================ */
+/* Green = solid, yellow = practised, red = never seen. One glance tells you
+   how much of the set already stands. */
+function split(d) {
+  const total = d.cards.length || 1;
+  const green = d.cards.filter(c => c.lvl >= 3).length;
+  const yellow = d.cards.filter(c => c.lvl < 3 && c.seen > 0).length;
+  const red = d.cards.length - green - yellow;
+  return { green: green, yellow: yellow, red: red,
+           pg: green / total * 100, py: yellow / total * 100, pr: red / total * 100 };
+}
+function barHtml(d) {
+  const x = split(d);
+  return '<div class="bar">' +
+    '<i class="g" style="width:' + x.pg + '%"></i>' +
+    '<i class="y" style="width:' + x.py + '%"></i>' +
+    '<i class="r" style="width:' + x.pr + '%"></i></div>';
+}
+function legendHtml(d) {
+  const x = split(d);
+  return '<div class="legend">' +
+    '<span class="g"><i></i>' + x.green + " solid</span>" +
+    '<span class="y"><i></i>' + x.yellow + " in progress</span>" +
+    '<span class="r"><i></i>' + x.red + " untouched</span></div>";
+}
+function renderHome() {
+  renderSync();
+  const wrap = $("deckList");
+  if (!db.decks.length) { wrap.innerHTML = '<p class="sub">No lists yet. Create one or import a file.</p>'; return; }
+  wrap.innerHTML = "";
+  db.decks.forEach(d => {
+    const tries = d.cards.reduce((s, c) => s + c.ok + c.bad, 0);
+    const acc = tries ? pct(d.cards.reduce((s, c) => s + c.ok, 0), tries) : null;
+
+    const el = document.createElement("div");
+    el.className = "deck";
+    el.innerHTML =
+      '<div class="deckmain">' +
+        '<div class="name"></div>' +
+        '<div class="hint">' + d.cards.length + " words · " + langName(d.lang) +
+          (acc === null ? "" : " · " + acc + "% accuracy") + "</div>" +
+        barHtml(d) + legendHtml(d) +
+      "</div>";
+    el.querySelector(".name").textContent = d.name;
+    const b1 = mkBtn("Learn", "primary", () => startSession(d.id));
+    const b2 = mkBtn("Progress", "", () => openProgress(d.id));
+    const b3 = mkBtn("Edit", "ghost", () => openEditor(d.id));
+    el.append(b1, b2, b3);
+    wrap.appendChild(el);
+  });
+}
+function mkBtn(label, cls, onclick) {
+  const b = document.createElement("button");
+  b.className = cls; b.textContent = label; b.onclick = onclick;
+  return b;
+}
+
+/* Bundled lists are added once per browser and then simply live under
+   "My lists". Delete one and it stays deleted. */
+function autoAddBundled() {
+  if (!Array.isArray(db.autoAdded)) db.autoAdded = [];
+  BUNDLED.forEach(b => {
+    if (db.autoAdded.indexOf(b.file) >= 0) return;
+    if (db.decks.some(d => d.src === b.file)) { db.autoAdded.push(b.file); save(); return; }
+    fetch(b.file, { cache: "no-cache" })
+      .then(r => r.ok ? r.text() : Promise.reject())
+      .then(txt => {
+        const pairs = parseText(txt);
+        if (!pairs.length) return;
+        const d = mkDeck(db.nextId++, b.name, b.lang, pairs.map(x => [x.de, x.a]));
+        d.src = b.file;
+        db.decks.push(d);
+        db.autoAdded.push(b.file);
+        save();
+        if (!$("home").classList.contains("hidden")) renderHome();
+      })
+      .catch(() => {});
+  });
+}
+/* If the bundled file has a better order by now, quietly re-sort the deck:
+   same words, same progress, just reordered. Any content difference means
+   the user edited it – then leave it alone. */
+function syncBundledOrder() {
+  BUNDLED.forEach(b => {
+    const deck = db.decks.find(d => d.src === b.file);
+    if (!deck) return;
+    fetch(b.file, { cache: "no-cache" })
+      .then(r => r.ok ? r.text() : Promise.reject())
+      .then(txt => {
+        const key = x => x.de + "|" + x.a;
+        const want = parseText(txt).map(key), have = deck.cards.map(key);
+        if (want.length !== have.length) return;
+        if (want.slice().sort().join("\n") !== have.slice().sort().join("\n")) return;
+        if (want.join("\n") === have.join("\n")) return;
+        const byKey = {};
+        deck.cards.forEach(c => { byKey[key(c)] = c; });
+        deck.cards = want.map(k => byKey[k]);
+        save();
+        if (!$("home").classList.contains("hidden")) renderHome();
+      })
+      .catch(() => {});
+  });
+}
+
+/* ============================ Progress ============================ */
+const GROUPS = [
+  { title: "Still shaky",   hint: "missed the last time it came up", test: c => c.seen > 0 && c.lvl === 0 },
+  { title: "Getting there", hint: "right once or twice",             test: c => c.lvl >= 1 && c.lvl <= 2 },
+  { title: "Solid",         hint: "three clean answers or more",     test: c => c.lvl >= 3 }
+];
+
+function dotsHtml(lvl) {
+  const n = Math.max(0, Math.min(5, lvl || 0));
+  return '<span class="on">' + "●".repeat(n) + "</span>" +
+         '<span class="off">' + "○".repeat(5 - n) + "</span>";
+}
+function openProgress(id) {
+  const d = deckById(id);
+  const worked = d.cards.filter(c => c.seen > 0);
+  const untouched = d.cards.length - worked.length;
+  const tries = d.cards.reduce((s, c) => s + c.ok + c.bad, 0);
+  const right = d.cards.reduce((s, c) => s + c.ok, 0);
+  const sits = d.cards.filter(c => c.lvl >= 3).length;
+
+  $("progTitle").textContent = d.name;
+  $("progSub").textContent = worked.length + " of " + d.cards.length + " words practised" +
+    (untouched ? " · " + untouched + " never seen yet" : "");
+  $("progBarWrap").innerHTML = barHtml(d) + legendHtml(d);
+  $("progStats").innerHTML =
+    tile(worked.length + "/" + d.cards.length, "practised") +
+    tile(sits, "solid", sits ? "good" : "") +
+    tile(tries ? pct(right, tries) + "%" : "–", "correct of " + tries + " answers", tries ? accClass(pct(right, tries)) : "") +
+    tile(d.cards.reduce((s, c) => s + c.bad, 0), "mistakes in total");
+
+  const groups = $("progGroups");
+  groups.innerHTML = "";
+  GROUPS.forEach(g => {
+    const rows = worked.filter(g.test)
+      .sort((a, b) => a.lvl - b.lvl || (b.bad - a.bad) || (b.seen - a.seen));
+    if (!rows.length) return;
+    const h = document.createElement("h2");
+    h.textContent = g.title + " (" + rows.length + ")";
+    const note = document.createElement("p");
+    note.className = "hintline"; note.style.margin = "-.3rem 0 .4rem";
+    note.textContent = g.hint;
+    const tbl = document.createElement("table");
+    tbl.className = "words";
+    const tb = document.createElement("tbody");
+    rows.forEach(c => {
+      const tr = document.createElement("tr");
+      const td1 = document.createElement("td"); td1.className = "de"; td1.textContent = c.de;
+      const td2 = document.createElement("td"); td2.className = "t";  td2.textContent = c.a;
+      const td3 = document.createElement("td"); td3.className = "lvl";
+      td3.innerHTML = dotsHtml(c.lvl);
+      if (c.lvl >= 3) td3.classList.add("full");
+      td3.title = "level " + c.lvl + " of 5";
+      const td4 = document.createElement("td"); td4.className = "n";
+      td4.textContent = c.ok + "/" + (c.ok + c.bad);
+      td4.title = c.ok + " correct, " + c.bad + " wrong";
+      tr.append(td1, td2, td3, td4);
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);
+    groups.append(h, note, tbl);
+  });
+  if (!worked.length) {
+    groups.innerHTML = '<p class="sub">Your progress shows up here once you have practised this list.</p>';
+  }
+
+  const weak = worked.filter(c => c.lvl <= 1 && c.bad > 0);
+  const btns = $("progButtons");
+  btns.innerHTML = "";
+  if (weak.length) {
+    btns.appendChild(mkBtn(weak.length === 1 ? "Practise the shaky one" : "Practise the " + weak.length + " shaky ones", "primary", () => startSession(d.id, weak)));
+  }
+  btns.appendChild(mkBtn("Learn the whole list", weak.length ? "" : "primary", () => startSession(d.id)));
+  go("prog");
+}
+
+/* ============================ Editor ============================ */
+let editingId = null;
+const SEP = /\t+|\s+=\s+|=|;|\s+[–—-]\s+/;
+
+function buildLangSelect() {
+  const sel = $("deckLang");
+  sel.innerHTML = "";
+  Object.keys(LANGS).forEach(k => {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = LANGS[k].name;
+    sel.appendChild(o);
+  });
+}
+function defaultLang() {
+  // whatever the user is working on right now, else Portuguese
+  return db.decks.length ? db.decks[db.decks.length - 1].lang : "pt";
+}
+function newDeck() {
+  editingId = null;
+  $("deckName").value = "";
+  $("deckLang").value = defaultLang();
+  $("deckText").value = "";
+  $("editInfo").textContent = "";
+  go("edit");
+  $("deckName").focus();
+}
+function openEditor(id) {
+  const d = deckById(id);
+  editingId = id;
+  $("deckName").value = d.name;
+  $("deckLang").value = d.lang;
+  $("deckText").value = d.cards.map(c => c.de + " = " + c.a).join("\n");
+  $("editInfo").textContent = d.cards.length + " entries saved.";
+  go("edit");
+}
+function parseText(txt) {
+  const out = [];
+  txt.split(/\r?\n/).forEach(line => {
+    line = line.trim();
+    if (!line) return;
+    const m = line.split(SEP);
+    if (m.length < 2) return;
+    const de = m[0].trim(), a = m.slice(1).join(" ").trim();
+    if (de && a) out.push({ de: de, a: a });
+  });
+  return out;
+}
+function saveDeck() {
+  const name = $("deckName").value.trim() || "Untitled";
+  const lang = $("deckLang").value;
+  const parsed = parseText($("deckText").value);
+  if (!parsed.length) { alert("No valid lines found. Format: German = translation"); return; }
+
+  let d = editingId ? deckById(editingId) : null;
+  if (!d) {
+    d = { id: db.nextId++, name: name, lang: lang, nextCard: 1, cards: [] };
+    db.decks.push(d);
+    editingId = d.id;
+  }
+  // Keep progress when a line is unchanged – and also when only the
+  // translation was corrected (match on the German side alone as fallback).
+  const exact = {}, byDe = {};
+  d.cards.forEach(c => { exact[c.de + "|" + c.a] = c; if (!byDe[c.de]) byDe[c.de] = c; });
+  d.name = name; d.lang = lang;
+  d.cards = parsed.map(p => {
+    const o = exact[p.de + "|" + p.a] || byDe[p.de];
+    return { id: d.nextCard++, de: p.de, a: p.a,
+             lvl: o ? o.lvl : 0, seen: o ? o.seen : 0, ok: o ? o.ok : 0, bad: o ? o.bad : 0, t: o ? (o.t || 0) : 0 };
+  });
+  save();
+  go("home");
+}
+function resetProgress() {
+  if (!editingId) return;
+  const d = deckById(editingId);
+  if (!confirm("Reset progress and statistics for this list?")) return;
+  d.cards.forEach(c => { c.lvl = 0; c.seen = 0; c.ok = 0; c.bad = 0; touch(c); });
+  save();
+  $("editInfo").textContent = "Progress reset.";
+}
+function deleteDeck() {
+  if (!editingId) { go("home"); return; }
+  const d = deckById(editingId);
+  if (!confirm('Delete the list "' + d.name + '"?')) return;
+  db.decks = db.decks.filter(x => x.id !== editingId);
+  save(); go("home");
+}
+function exportDeck() {
+  const name = $("deckName").value.trim() || "vocab";
+  const blob = new Blob([$("deckText").value], { type: "text/plain" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name.replace(/[^\w\sÀ-ɏ-]/g, "") + ".txt";
+  a.click();
+}
+function importFile() {
+  const inp = $("fileInput");
+  inp.value = "";
+  inp.onchange = () => {
+    const f = inp.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      newDeck();
+      $("deckName").value = f.name.replace(/\.[^.]+$/, "");
+      $("deckText").value = r.result;
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+}
+
+/* ================= Grading: typos, accents, alternatives ================= */
+function norm(s) {
+  return s.toLowerCase()
+    .replace(/[‘’´`]/g, "'")
+    .replace(/\s+/g, " ")
+    .replace(/[.!?]+$/g, "")
+    .trim();
+}
+function deaccent(s) { return s.normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+/* without punctuation (accents kept) / additionally without accents */
+function nopunct(s) {
+  return norm(s).replace(/[,;:!?.¿¡]/g, "").replace(/\s+/g, " ").trim();
+}
+function flat(s) {
+  return deaccent(nopunct(s)).replace(/[-'\/]/g, " ").replace(/\s+/g, " ").trim();
+}
+/* Only "/" separates alternatives – commas occur inside whole sentences
+   ("a conta, por favor") and must not split them. */
+function alternatives(a) { return a.split(/\s*[\/|]\s*/).map(s => s.trim()).filter(Boolean); }
+
+/* With several valid answers, typing one is enough – but typing all of them
+   together also counts, in any order, with "/", comma, semicolon or just a
+   space in between. */
+function permute(arr) {
+  if (arr.length <= 1) return [arr];
+  const out = [];
+  arr.forEach((x, i) => {
+    const rest = arr.slice(0, i).concat(arr.slice(i + 1));
+    permute(rest).forEach(r => out.push([x].concat(r)));
+  });
+  return out;
+}
+function joinForms(alts) {
+  if (alts.length < 2 || alts.length > 4) return [];
+  const seps = [" ", " / ", "/", ", ", ",", "; ", ";", " - "];
+  const out = [];
+  permute(alts).forEach(p => seps.forEach(sep => out.push(p.join(sep))));
+  return out;
+}
+
+/* Damerau-Levenshtein: swapped letters (chein/chien) count as one edit */
+function lev(a, b) {
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const d = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) d[i][0] = i;
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1])
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[m][n];
+}
+/* Very short words get no edit tolerance: de/do, ela/ele, um/uma are
+   different words, not typos. (Missing accents are handled separately.) */
+function tolerance(len) { return len <= 3 ? 0 : len <= 9 ? 1 : 2; }
+
+function judge(input, answer) {
+  const alts = alternatives(answer);
+  const ni = norm(input);
+  if (!ni) return { verdict: "bad", target: alts[0] };
+  for (const alt of alts) if (ni === norm(alt)) return { verdict: "ok", target: alt };
+
+  const combos = joinForms(alts);
+  const full = alts.join(" / ");
+  for (const cmb of combos) if (ni === norm(cmb)) return { verdict: "ok", target: full };
+
+  // punctuation is irrelevant ("a conta por favor" == "a conta, por favor"), accents are not
+  const np = nopunct(input);
+  for (const alt of alts) if (np === nopunct(alt)) return { verdict: "ok", target: alt };
+  for (const cmb of combos) if (np === nopunct(cmb)) return { verdict: "ok", target: full };
+
+  const nf = flat(input);
+  for (const alt of alts) if (nf === flat(alt)) return { verdict: "typo", target: alt };
+  for (const cmb of combos) if (nf === flat(cmb)) return { verdict: "typo", target: full };
+
+  let best = null, bestD = 99;
+  for (const alt of alts) {
+    const d = lev(deaccent(ni), deaccent(norm(alt)));
+    if (d < bestD) { bestD = d; best = alt; }
+  }
+  if (best && bestD <= tolerance(deaccent(norm(best)).length)) return { verdict: "typo", target: best };
+  return { verdict: "bad", target: best || alts[0] };
+}
+
+/* character diff of the input against the solution (display only) */
+function diffHtml(input, target) {
+  const a = input, b = target, m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = m - 1; i >= 0; i--)
+    for (let j = n - 1; j >= 0; j--)
+      dp[i][j] = a[i].toLowerCase() === b[j].toLowerCase()
+        ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  let i = 0, j = 0, out = "";
+  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  while (i < m && j < n) {
+    if (a[i].toLowerCase() === b[j].toLowerCase()) { out += '<span class="diff-ok">' + esc(a[i]) + "</span>"; i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { out += '<span class="diff-bad">' + esc(a[i]) + "</span>"; i++; }
+    else j++;
+  }
+  while (i < m) { out += '<span class="diff-bad">' + esc(a[i]) + "</span>"; i++; }
+  return out;
+}
+
+/* ============================ Session / sections ============================ */
+let S = null;
+const $ = id => document.getElementById(id);
+const answerEl = $("answer"), fbEl = $("fb"), cardEl = $("card"),
+      mainBtn = $("mainBtn"), dunnoBtn = $("dunnoBtn"), okBtn = $("okBtn"),
+      hintEl = $("hintline");
+
+function wordRec(c) {
+  return S.words[c.id] || (S.words[c.id] = { card: c, err: 0, typo: 0 });
+}
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function gap(range) { return range[0] + Math.floor(Math.random() * (range[1] - range[0] + 1)); }
+const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
+
+function startSession(deckId, onlyCards) {
+  const d = deckById(deckId);
+  if (!d || !d.cards.length) { alert("This list is empty."); return; }
+  // Introduction order = list order (single words first, sentences last).
+  // Only the level may pull forward: what has never sat comes before what
+  // already does. The mistake count must NOT reorder – otherwise the hard
+  // sentences from last time land right at the start again.
+  const pool = (onlyCards && onlyCards.length ? onlyCards.slice() : d.cards.slice())
+    .map((c, i) => ({ c: c, i: i }));
+  pool.sort((x, y) => x.c.lvl - y.c.lvl || x.i - y.i);
+
+  S = {
+    deckId: deckId, lang: d.lang,
+    fresh: pool.map(x => x.c),   // not yet introduced
+    learned: [],                 // learned this run after a stumble (source for reviews)
+    round: null, roundNum: 0,
+    tot: { asked: 0, right: 0, typo: 0, wrong: 0, firstLooks: 0, firstTry: 0, cards: 0 },
+    words: {},                   // cardId -> { card, err, typo } across the run
+    phase: "idle"
+  };
+  buildAccents(d.lang);
+  answerEl.placeholder = "type in " + langName(d.lang) + " …";
+  go("study");
+  startRound([]);
+}
+
+function startRound(carry) {
+  const items = carry.slice();
+  while (items.length < ROUND_NEW && S.fresh.length) {
+    const c = S.fresh.shift();
+    items.push({ card: c, need: NEED_NEW, correct: 0, tries: 0, err: 0, typo: 0, review: false, done: false });
+  }
+  // reviews: touch words again that took effort earlier in this run
+  const revPool = S.learned.filter(c => !items.some(i => i.card.id === c.id));
+  shuffle(revPool);
+  revPool.slice(0, ROUND_REVIEW).forEach(c =>
+    items.push({ card: c, need: NEED_REVIEW, correct: 0, tries: 0, err: 0, typo: 0, review: true, done: false }));
+
+  if (!items.length) return finishSession();
+
+  S.roundNum++;
+  S.round = {
+    items: items, queue: shuffle(items.slice()),
+    asked: 0, right: 0, typo: 0, wrong: 0, firstLooks: 0, firstTry: 0,
+    newCount: items.filter(i => !i.review).length
+  };
+  nextCard();
+}
+
+function roundOver() {
+  const r = S.round;
+  if (!r.queue.length) return true;
+  const allAsked = r.items.every(i => i.tries > 0);
+  const done = r.items.filter(i => i.done).length;
+  return allAsked && done / r.items.length >= MASTERY;
+}
+
+function nextCard() {
+  if (roundOver()) return finishRound();
+  S.it = S.round.queue[0];
+  S.phase = "ask";
+  S.firstLook = S.it.tries === 0;
+  cardEl.className = "card";
+  fbEl.className = "fb hidden";
+  fbEl.innerHTML = "";
+  $("revTag").classList.toggle("hidden", !S.it.review);
+  $("qword").textContent = S.it.card.de;
+  answerEl.value = "";
+  mainBtn.textContent = "Check";
+  dunnoBtn.classList.remove("hidden");
+  okBtn.classList.add("hidden");
+  S.wasTypo = false;
+  const nAlt = alternatives(S.it.card.a).length;
+  hintEl.innerHTML = nAlt > 1
+    ? nAlt + " variants — one is enough, <kbd>Tab</kbd> appends the next"
+    : "<kbd>Enter</kbd> to check";
+  updateProgress();
+  answerEl.focus();
+}
+
+function updateProgress() {
+  const r = S.round;
+  const done = r.items.filter(i => i.done).length;
+  // The bar counts every correct answer, not just finished words –
+  // otherwise it sits at zero for the whole first half of a section.
+  const steps = r.items.reduce((s, i) => s + Math.min(i.correct, i.need), 0);
+  const need  = r.items.reduce((s, i) => s + i.need, 0);
+  $("progBar").style.width = (need ? Math.round(steps / need * 100) : 0) + "%";
+  $("counter").textContent = done + " / " + r.items.length;
+  const reviews = r.items.length - r.newCount;
+  $("roundline").textContent =
+    "Section " + S.roundNum + " · " + plural(r.newCount, "new word", "new words") +
+    (reviews ? " + " + plural(reviews, "review", "reviews") : "") +
+    " · " + plural(S.fresh.length, "word", "words") + " left in the list";
+}
+
+function check() {
+  const input = answerEl.value;
+  if (!input.trim()) { shake(); return; }
+  const it = S.it, c = it.card;
+  const res = judge(input, c.a);
+  S.lastInput = input;
+  it.tries++; S.tot.asked++; S.round.asked++;
+  if (S.firstLook) { S.tot.firstLooks++; S.round.firstLooks++; }
+  c.seen++; touch(c);
+  const rec = wordRec(c);
+
+  if (res.verdict === "ok") { markCorrect(res.target, "Correct"); return; }
+
+  c.bad++;
+  it.err++; rec.err++;
+  if (res.verdict === "typo") { it.typo++; rec.typo++; S.tot.typo++; S.round.typo++; }
+  else {
+    S.tot.wrong++; S.round.wrong++;
+    it.correct = 0;                       // a real mistake: start over
+    c.lvl = Math.max(0, c.lvl - 1);
+  }
+  save();
+  enterRetype(res);
+}
+
+/* Shared path for "that was right" – whether typed correctly straight away
+   or claimed afterwards via the typo override. */
+function markCorrect(target, headline) {
+  const it = S.it, c = it.card;
+  c.ok++; touch(c); S.tot.right++; S.round.right++;
+  if (S.firstLook) { S.tot.firstTry++; S.round.firstTry++; }
+  it.correct++;
+  // right on the first try = done for this run, no second round of asking
+  if (S.firstLook && it.err === 0) it.need = 1;
+  cardEl.className = "card ok";
+  fbEl.className = "fb ok";
+  fbEl.innerHTML = '<div class="head"></div><div class="sol"></div>';
+  fbEl.querySelector(".head").textContent = headline;
+  fbEl.querySelector(".sol").textContent = target;
+  const others = alternatives(c.a).filter(x => x !== target);
+  if (others.length) {
+    const extra = document.createElement("div");
+    extra.className = "yours";
+    extra.textContent = "also: " + others.join(", ");
+    fbEl.appendChild(extra);
+  }
+
+  S.round.queue.shift();
+  if (it.correct >= it.need) {
+    it.done = true;
+    c.lvl = Math.min(5, c.lvl + 1);
+    if (!it.review) {
+      S.tot.cards++;
+      // only words that took effort come back as reviews later in this run
+      if (it.err > 0 && !S.learned.some(x => x.id === c.id)) S.learned.push(c);
+    }
+    // keep a custom headline (typo override), otherwise say what happened to the word
+    if (headline === "Correct") fbEl.querySelector(".head").textContent = it.review ? "Still solid" : "Learned";
+    else fbEl.querySelector(".head").textContent = headline + " — learned";
+  } else {
+    // comes back after a gap – that spacing is the actual learning effect
+    S.round.queue.splice(Math.min(S.round.queue.length, gap(GAP_OK)), 0, it);
+  }
+  save();
+  S.phase = "correct";
+  mainBtn.textContent = "Next";
+  dunnoBtn.classList.add("hidden");
+  okBtn.classList.add("hidden");
+  answerEl.focus();
+  fbEl.scrollIntoView({ block: "nearest" });
+  updateProgress();
+  const last = roundOver();
+  hintEl.innerHTML = last ? "Section done — summary coming up …" : "<kbd>Enter</kbd> for the next word";
+  autoAdvance("correct", last ? 1400 : 700);
+}
+
+/* Advance on a timer, but only if nothing else happened in the meantime
+   (user pressed Enter, quit the session, …). */
+function autoAdvance(phase, ms) {
+  const stamp = S.tot.asked, session = S;
+  setTimeout(() => {
+    if (S === session && S.phase === phase && S.tot.asked === stamp) nextCard();
+  }, ms);
+}
+
+/* "No, that was right" – only after a typo verdict. Rolls the mistake back
+   and treats the answer as correct. */
+function overrideTypo() {
+  if (S.phase !== "retype" || !S.wasTypo) return;
+  const it = S.it, c = it.card, rec = wordRec(c);
+  c.bad--; touch(c);
+  it.err--; it.typo--; rec.err--; rec.typo--;
+  S.tot.typo--; S.round.typo--;
+  const i = S.round.queue.indexOf(it);       // was already re-queued
+  if (i >= 0) S.round.queue.splice(i, 1);
+  S.round.queue.unshift(it);                 // markCorrect expects it up front
+  S.wasTypo = false;
+  markCorrect(S.target, "OK, counts as correct");
+}
+
+function enterRetype(res) {
+  const typo = res.verdict === "typo";
+  S.phase = "retype";
+  S.target = res.target;
+  S.wasTypo = typo;
+  cardEl.className = "card " + (typo ? "typo" : "bad");
+  fbEl.className = "fb " + (typo ? "typo" : "bad");
+  fbEl.innerHTML =
+    '<div class="head">' + (typo ? "Almost — small typo" : "Not quite") + "</div>" +
+    '<div class="sol"></div>' +
+    (S.lastInput && S.lastInput.trim() ? '<div class="yours">You: ' + diffHtml(S.lastInput.trim(), res.target) + "</div>" : "");
+  fbEl.querySelector(".sol").textContent = res.target;
+
+  S.round.queue.shift();
+  S.round.queue.splice(Math.min(S.round.queue.length, gap(GAP_ERR)), 0, S.it);
+
+  answerEl.value = "";
+  mainBtn.textContent = "Submit";
+  dunnoBtn.classList.add("hidden");
+  okBtn.classList.toggle("hidden", !typo);
+  hintEl.innerHTML = typo
+    ? "Retype it — or hit “Was right” if you only slipped."
+    : "Type the correct answer once — it moves on by itself.";
+  answerEl.focus();
+  fbEl.scrollIntoView({ block: "nearest" });
+  updateProgress();
+}
+
+/* A short "got it" after correcting – otherwise there's no feedback at all,
+   especially if the section summary follows right after. */
+function retypeDone() {
+  S.phase = "confirm";
+  cardEl.className = "card ok";
+  fbEl.className = "fb ok";
+  fbEl.innerHTML = '<div class="head">Retyped correctly</div><div class="sol"></div>';
+  fbEl.querySelector(".sol").textContent = S.target;
+  okBtn.classList.add("hidden");
+  mainBtn.textContent = "Next";
+  const last = roundOver();
+  hintEl.innerHTML = last ? "Section done — summary coming up …" : "<kbd>Enter</kbd> for the next word";
+  answerEl.value = "";
+  answerEl.focus();
+  fbEl.scrollIntoView({ block: "nearest" });
+  autoAdvance("confirm", last ? 1400 : 650);
+}
+
+function checkRetype() {
+  const v = answerEl.value;
+  if (nopunct(v) === nopunct(S.target)) { retypeDone(); return; }
+  shake();
+  hintEl.innerHTML = flat(v) === flat(S.target)
+    ? "Accents are still missing — use the keys under the field."
+    : "Not identical yet — type it exactly as shown.";
+}
+
+/* While retyping, move on by itself as soon as the field matches – no Enter needed. */
+function autoRetype() {
+  if (S && S.phase === "retype" && nopunct(answerEl.value) === nopunct(S.target)) retypeDone();
+}
+
+function dunno() {
+  S.lastInput = "";
+  const it = S.it, c = it.card;
+  it.tries++; it.err++; it.correct = 0;
+  S.tot.asked++; S.tot.wrong++; S.round.asked++; S.round.wrong++;
+  if (S.firstLook) { S.tot.firstLooks++; S.round.firstLooks++; }
+  c.seen++; c.bad++; touch(c);
+  c.lvl = Math.max(0, c.lvl - 1);
+  wordRec(c).err++;
+  save();
+  enterRetype({ verdict: "bad", target: alternatives(c.a)[0] });
+}
+
+function shake() {
+  answerEl.classList.remove("shake");
+  void answerEl.offsetWidth;
+  answerEl.classList.add("shake");
+}
+
+/* ============================ Summaries ============================ */
+function pct(part, whole) { return whole ? Math.round(part / whole * 100) : 0; }
+function tile(value, label, cls) {
+  return '<div class="tile ' + (cls || "") + '"><b>' + value + "</b><small>" + label + "</small></div>";
+}
+function accClass(p) { return p >= 80 ? "good" : p >= 60 ? "warn" : "bad"; }
+
+/* every word that came up in this run – hardest first */
+function sessionRows() {
+  return Object.keys(S.words).map(id => S.words[id])
+    .sort((a, b) => (b.err - a.err) || (b.typo - a.typo));
+}
+function hardestCards() {
+  return sessionRows().filter(r => r.err > 0).map(r => r.card);
+}
+function status(r) {
+  if (!r.err) return { text: "first try", cls: "ok" };
+  if (r.typo === r.err) return { text: plural(r.typo, "typo", "typos"), cls: "typo" };
+  return { text: plural(r.err, "mistake", "mistakes"), cls: "bad" };
+}
+function renderWords(rows, title) {
+  const wrap = $("sumWordsWrap"), tb = $("sumWords");
+  if (!rows.length) { wrap.classList.add("hidden"); return; }
+  wrap.classList.remove("hidden");
+  $("sumWordsTitle").textContent = title + " (" + rows.length + ")";
+  tb.innerHTML = "";
+  rows.forEach(r => {
+    const st = status(r);
+    const tr = document.createElement("tr");
+    const td1 = document.createElement("td"); td1.className = "de"; td1.textContent = r.card.de;
+    const td2 = document.createElement("td"); td2.className = "t";  td2.textContent = r.card.a;
+    const td3 = document.createElement("td"); td3.className = "n " + st.cls; td3.textContent = st.text;
+    tr.append(td1, td2, td3);
+    tb.appendChild(tr);
+  });
+}
+
+function finishRound() {
+  const r = S.round;
+  const carry = r.items.filter(i => !i.done && !i.review);
+  const doneCount = r.items.filter(i => i.done).length;
+  const accuracy = pct(r.right, r.asked);
+  const firstTryPct = pct(r.firstTry, r.firstLooks);
+
+  if (!S.fresh.length && !carry.length) return finishSession();
+
+  S.phase = "summary";
+  $("sumTitle").textContent = "Section " + S.roundNum + " done";
+  $("sumSub").textContent =
+    doneCount + " of " + r.items.length + " words solid" +
+    (carry.length ? " · " + carry.length + " carry over to the next section" : "") +
+    " · " + plural(S.fresh.length, "new word", "new words") + " left in the list";
+  $("sumStats").innerHTML =
+    tile(accuracy + "%", "correct of " + r.asked + " answers", accClass(accuracy)) +
+    tile(firstTryPct + "%", "right on the first try", accClass(firstTryPct)) +
+    tile(r.asked, "attempts") +
+    tile(r.typo, "typos", r.typo ? "warn" : "") +
+    tile(r.wrong, "wrong", r.wrong ? "bad" : "");
+  renderWords(
+    r.items.map(i => ({ card: i.card, err: i.err, typo: i.typo }))
+           .sort((a, b) => (b.err - a.err) || (b.typo - a.typo)),
+    "All words in this section");
+
+  const btns = $("sumButtons");
+  btns.innerHTML = "";
+  const next = mkBtn("On to section " + (S.roundNum + 1), "primary", () => { go("study"); startRound(carry); });
+  btns.append(next, mkBtn("Take a break", "ghost", () => { save(); go("home"); }));
+  save();
+  go("sum");
+  next.focus();
+}
+
+function finishSession() {
+  const t = S.tot;
+  const accuracy = pct(t.right, t.asked);
+  const firstTryPct = pct(t.firstTry, t.firstLooks);
+  const perWord = t.cards ? (t.asked / t.cards).toFixed(1) : "0";
+
+  S.phase = "summary";
+  $("sumTitle").textContent = "Run complete";
+  $("sumSub").textContent =
+    plural(t.cards, "word", "words") + " learned in " + plural(S.roundNum, "section", "sections") +
+    " · " + plural(t.asked, "answer", "answers") + " in total";
+  $("sumStats").innerHTML =
+    tile(accuracy + "%", "correct of " + t.asked + " answers", accClass(accuracy)) +
+    tile(firstTryPct + "%", "right on the first try", accClass(firstTryPct)) +
+    tile(perWord, "attempts per word") +
+    tile(t.typo, "typos", t.typo ? "warn" : "") +
+    tile(t.wrong, "wrong", t.wrong ? "bad" : "");
+  renderWords(sessionRows(), "All words in this run");
+
+  const deckId = S.deckId;
+  const hardCards = hardestCards();
+  const btns = $("sumButtons");
+  btns.innerHTML = "";
+  btns.appendChild(mkBtn("Go again", "primary", () => startSession(deckId)));
+  if (hardCards.length) {
+    btns.appendChild(mkBtn(hardCards.length === 1 ? "Just the shaky one" : "Just the " + hardCards.length + " shaky ones", "", () => startSession(deckId, hardCards)));
+  }
+  btns.appendChild(mkBtn("Back to overview", "ghost", () => go("home")));
+  save();
+  go("sum");
+}
+
+function quitStudy() {
+  if (S) S.phase = "idle";   // stops any pending auto-advance from resurfacing a summary
+  save();
+  go("home");
+}
+
+/* ============================ Input ============================ */
+function buildAccents(lang) {
+  const wrap = $("accents");
+  wrap.innerHTML = "";
+  ((LANGS[lang] || LANGS.xx).chars || []).forEach(ch => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = ch;
+    b.onmousedown = e => e.preventDefault();
+    b.onclick = () => insertChar(ch);
+    wrap.appendChild(b);
+  });
+}
+function insertChar(ch) {
+  const el = answerEl;
+  const s = el.selectionStart, e = el.selectionEnd;
+  el.value = el.value.slice(0, s) + ch + el.value.slice(e);
+  el.selectionStart = el.selectionEnd = s + ch.length;
+  el.focus();
+  autoRetype();
+}
+function act() {
+  if (!S) return;
+  if (S.phase === "ask") check();
+  else if (S.phase === "retype") checkRetype();
+  else if (S.phase === "correct" || S.phase === "confirm") nextCard();
+}
+
+mainBtn.onclick = act;
+dunnoBtn.onclick = () => { if (S && S.phase === "ask") dunno(); };
+okBtn.onclick = overrideTypo;
+answerEl.addEventListener("input", autoRetype);
+answerEl.addEventListener("keydown", e => {
+  // Tab inserts " / " when the word has several valid answers
+  if (e.key === "Tab" && answerEl.value.trim() && S && S.phase === "ask" &&
+      alternatives(S.it.card.a).length > 1 && !/\/\s*$/.test(answerEl.value)) {
+    e.preventDefault();
+    insertChar(" / ");
+    return;
+  }
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  e.stopPropagation();
+  act();
+});
+document.addEventListener("keydown", e => {
+  if (!S || $("study").classList.contains("hidden")) return;
+  if (e.key === "Enter" && (S.phase === "correct" || S.phase === "confirm")) { e.preventDefault(); nextCard(); }
+  if (e.key === "Escape") quitStudy();
+});
+
+const VERSION = "v17 · 2026-09-24";
+$("version").textContent =
+  VERSION + " — if you see something else here, your browser is still on the old page (reload).";
+$("rules").textContent =
+  "You learn in sections of " + ROUND_NEW + " new words. Right on the first try means done for this run; " +
+  "anything you miss comes back later in the section and gets mixed into later sections as review. " +
+  "New words are added once " + Math.round(MASTERY * 100) + "% of a section sits.";
+
+buildLangSelect();
+buildAccents(defaultLang());
+go("home");
+pullNow().then(() => { autoAddBundled(); syncBundledOrder(); });
+</script>
+</body>
+</html>
