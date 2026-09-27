@@ -299,20 +299,22 @@ const BUNDLED = [
 const KEY = "vokabeltrainer.v1";
 let db = load();
 
-/* corrected answers in bundled lists: "de|old answer" -> new answer.
+/* corrected pairs in bundled lists: "old de|old answer" -> [new de, new answer].
    Cards are keyed by de|a, so without this an edited pair would come back
    as a duplicate from any device or server copy that still has the old one. */
 const RENAMED = {
-  "guten Tag|boa tarde": "bom dia / boa tarde"
+  "guten Tag|boa tarde":           ["guten Morgen / guten Tag", "bom dia"],
+  "guten Tag|bom dia / boa tarde": ["guten Morgen / guten Tag", "bom dia"],
+  "guten Morgen|bom dia":          ["guten Morgen / guten Tag", "bom dia"]
 };
 function applyRenames(d) {
   (d.decks || []).forEach(deck => {
     (deck.cards || []).slice().forEach(c => {
-      const na = RENAMED[c.de + "|" + c.a];
-      if (na === undefined) return;
-      const twin = deck.cards.find(x => x.de === c.de && x.a === na);
-      if (!twin) { c.a = na; return; }
-      // both versions present: keep whichever was practised last
+      const to = RENAMED[c.de + "|" + c.a];
+      if (!to) return;
+      const twin = deck.cards.find(x => x !== c && x.de === to[0] && x.a === to[1]);
+      if (!twin) { c.de = to[0]; c.a = to[1]; return; }
+      // several old cards land on the same new one: keep whichever was practised last
       if ((c.t || 0) > (twin.t || 0)) {
         twin.lvl = c.lvl; twin.seen = c.seen; twin.ok = c.ok; twin.bad = c.bad; twin.t = c.t;
       }
@@ -570,13 +572,15 @@ function syncBundledOrder() {
       .then(r => r.ok ? r.text() : Promise.reject())
       .then(txt => {
         const key = x => x.de + "|" + x.a;
-        const want = parseText(txt).map(key), have = deck.cards.map(key);
-        if (want.length !== have.length) return;
-        if (want.slice().sort().join("\n") !== have.slice().sort().join("\n")) return;
+        const pairs = parseText(txt), want = pairs.map(key), have = deck.cards.map(key);
+        // only touch decks whose cards all still come from the file (not hand-edited)
+        if (have.some(k => want.indexOf(k) < 0)) return;
         if (want.join("\n") === have.join("\n")) return;
         const byKey = {};
         deck.cards.forEach(c => { byKey[key(c)] = c; });
-        deck.cards = want.map(k => byKey[k]);
+        // pairs added to the file later join the deck as fresh cards
+        deck.cards = pairs.map(x => byKey[key(x)] ||
+          { id: deck.nextCard++, de: x.de, a: x.a, lvl: 0, seen: 0, ok: 0, bad: 0, t: 0 });
         save();
         if (!$("home").classList.contains("hidden")) renderHome();
       })
@@ -1337,7 +1341,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") quitStudy();
 });
 
-const VERSION = "v19 · 2026-09-27";
+const VERSION = "v20 · 2026-09-27";
 $("version").textContent =
   VERSION + " — if you see something else here, your browser is still on the old page (reload).";
 $("rules").textContent =
