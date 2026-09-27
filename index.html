@@ -299,6 +299,28 @@ const BUNDLED = [
 const KEY = "vokabeltrainer.v1";
 let db = load();
 
+/* corrected answers in bundled lists: "de|old answer" -> new answer.
+   Cards are keyed by de|a, so without this an edited pair would come back
+   as a duplicate from any device or server copy that still has the old one. */
+const RENAMED = {
+  "guten Tag|boa tarde": "bom dia / boa tarde"
+};
+function applyRenames(d) {
+  (d.decks || []).forEach(deck => {
+    (deck.cards || []).slice().forEach(c => {
+      const na = RENAMED[c.de + "|" + c.a];
+      if (na === undefined) return;
+      const twin = deck.cards.find(x => x.de === c.de && x.a === na);
+      if (!twin) { c.a = na; return; }
+      // both versions present: keep whichever was practised last
+      if ((c.t || 0) > (twin.t || 0)) {
+        twin.lvl = c.lvl; twin.seen = c.seen; twin.ok = c.ok; twin.bad = c.bad; twin.t = c.t;
+      }
+      deck.cards.splice(deck.cards.indexOf(c), 1);
+    });
+  });
+}
+
 function load() {
   let d = null;
   try { d = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
@@ -320,6 +342,7 @@ function load() {
       if (!c.t) c.t = c.seen ? 1 : 0;
     });
   });
+  applyRenames(d);
   return d;
 }
 function save() {
@@ -366,6 +389,7 @@ function newer(rc, lc) {
 /* merge the remote db into the local one; returns true if local changed */
 function mergeInto(local, remote) {
   let changed = false;
+  applyRenames(remote);
   (remote.decks || []).forEach(rd => {
     const ld = local.decks.find(d => deckMatch(d, rd));
     if (!ld) {
@@ -1313,7 +1337,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") quitStudy();
 });
 
-const VERSION = "v18 · 2026-09-24";
+const VERSION = "v19 · 2026-09-27";
 $("version").textContent =
   VERSION + " — if you see something else here, your browser is still on the old page (reload).";
 $("rules").textContent =
