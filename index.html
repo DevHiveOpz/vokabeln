@@ -297,7 +297,6 @@ const BUNDLED = [
 
 /* ============================ Storage ============================ */
 const KEY = "vokabeltrainer.v1";
-let db = load();
 
 /* corrected pairs in bundled lists: "old de|old answer" -> [new de, new answer].
    Cards are keyed by de|a, so without this an edited pair would come back
@@ -322,6 +321,9 @@ function applyRenames(d) {
     });
   });
 }
+
+// after RENAMED: load() uses it, and a const is unusable before its line runs
+let db = load();
 
 function load() {
   let d = null;
@@ -1341,7 +1343,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") quitStudy();
 });
 
-const VERSION = "v20 · 2026-09-27";
+const VERSION = "v21 · 2026-09-28";
 $("version").textContent =
   VERSION + " — if you see something else here, your browser is still on the old page (reload).";
 $("rules").textContent =
