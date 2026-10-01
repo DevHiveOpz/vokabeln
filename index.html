@@ -290,6 +290,9 @@ const BUNDLED = [
   { file: "listen/portugiesisch-150.txt", lang: "pt",
     name: "Portuguese (BR) – the 150 most important words",
     oldNames: ["Portugiesisch (BR) – die 150 wichtigsten Wörter"] },
+  { file: "listen/portugiesisch-150-2.txt", lang: "pt",
+    name: "Portuguese (BR) – the next 150 words",
+    oldNames: [] },
   { file: "listen/deutsch-schweiz-150.txt", lang: "de", from: "zh",
     name: "Deutsch (Schweiz) – 150 Grundwörter · 瑞士德语基础词汇",
     oldNames: [] }
@@ -1343,7 +1346,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") quitStudy();
 });
 
-const VERSION = "v21 · 2026-09-28";
+const VERSION = "v22 · 2026-10-01";
 $("version").textContent =
   VERSION + " — if you see something else here, your browser is still on the old page (reload).";
 $("rules").textContent =
