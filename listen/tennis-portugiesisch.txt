@@ -51,6 +51,7 @@ schneller = mais rápido
 langsamer = mais devagar
 fester (härter schlagen) = mais forte
 lockerer = mais solto
+mehr Intensität = mais intensidade
 noch einmal = de novo / mais uma vez
 noch einer (noch ein Ball) = mais uma
 gut! = boa!
