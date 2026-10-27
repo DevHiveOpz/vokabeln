@@ -132,6 +132,32 @@
   table.words td.lvl.full .on { color: #3fb96b; }
   #progGroups h2 { margin-top: 1.5rem; }
 
+  /* ---------------- speak ---------------- */
+  .spk-target { font-size: 1.9rem; font-weight: 600; line-height: 1.25; margin: .35rem 0 .3rem; word-break: break-word; }
+  .spk-target .w { border-radius: 5px; padding: 0 .12rem; }
+  .spk-target .w.ok { color: #7fd39b; }
+  .spk-target .w.near { color: #e0bb72; }
+  .spk-target .w.bad { color: #ff8b76; text-decoration: underline wavy #ff8b7699; text-underline-offset: .25em; }
+  .spk-de { color: #8a93a3; font-size: .95rem; margin-bottom: 1.2rem; }
+  .spk-tools { display: flex; gap: .5rem; flex-wrap: wrap; }
+  .mic {
+    width: 100%; min-height: 64px; margin-top: 1rem; font-size: 1.05rem; font-weight: 600;
+    background: #2f6fb5; border-color: #2f6fb5; color: #fff;
+  }
+  .mic:hover { background: #3a80cc; }
+  .mic.rec { background: #c0392b; border-color: #c0392b; animation: pulse 1.1s infinite; }
+  .mic:disabled { opacity: .55; cursor: default; animation: none; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 8px #c0392b33; } }
+  .spk-res { margin-top: 1.1rem; font-size: .92rem; line-height: 1.5; }
+  .spk-score { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .spk-score.good { color: #3fb96b; } .spk-score.warn { color: #d9a441; } .spk-score.bad { color: #ff8b76; }
+  .spk-heard { color: #b9c1cd; margin-top: .3rem; }
+  .spk-heard b { color: #fff; font-weight: 500; }
+  .tip { background: #141920; border: 1px solid #262e3a; border-left: 3px solid #d9a441; border-radius: 8px; padding: .55rem .7rem; margin-top: .5rem; }
+  .tip b { color: #e0bb72; font-weight: 600; margin-right: .35rem; }
+  .spk-ipa { font-size: .74rem; color: #6f7888; margin-top: .6rem; font-family: ui-monospace, Menlo, monospace; word-break: break-word; }
+  .spk-ipa summary { cursor: pointer; }
+
   /* ---------------- phone ---------------- */
   @media (max-width: 600px) {
     body { padding-top: 1.1rem; }
@@ -230,6 +256,34 @@
   </div>
 </section>
 
+<!-- ======================= SPEAK ======================= -->
+<section id="speak" class="hidden">
+  <div class="topbar">
+    <button class="ghost" onclick="quitSpeak()" title="Back to overview (Esc)">←</button>
+    <div class="prog"><i id="spkBar"></i></div>
+    <div class="counter" id="spkCounter"></div>
+  </div>
+  <div class="roundline" id="spkLine"></div>
+
+  <div class="card" id="spkCard">
+    <div class="qlabel">Say it out loud</div>
+    <div class="spk-target" id="spkTarget"></div>
+    <div class="spk-de" id="spkDe"></div>
+    <div class="spk-tools">
+      <button onclick="sayIt(1)">▶ Listen</button>
+      <button onclick="sayIt(0.6)">🐢 Slow</button>
+      <button id="spkMine" class="hidden" onclick="playMine()">▶ Me</button>
+    </div>
+    <button class="mic" id="micBtn" onclick="toggleRec()">🎤 Tap and speak</button>
+    <div class="spk-res hidden" id="spkRes"></div>
+    <div class="row" style="margin-top:1rem">
+      <span class="spacer"></span>
+      <button id="spkNext" class="ghost" onclick="spkNext()">Skip</button>
+    </div>
+    <p class="hintline" id="spkHint">Listen first, then tap the mic, say it, tap again to stop.</p>
+  </div>
+</section>
+
 <!-- ======================= PROGRESS ======================= -->
 <section id="prog" class="hidden">
   <button class="ghost" onclick="go('home')">← back</button>
@@ -295,6 +349,9 @@ const BUNDLED = [
     oldNames: [] },
   { file: "listen/tennis-portugiesisch.txt", lang: "pt",
     name: "Portuguese (BR) – tennis with your coach",
+    oldNames: [] },
+  { file: "listen/aussprache-fallen.txt", lang: "pt",
+    name: "Portuguese (BR) – pronunciation traps for Spanish speakers (use Speak)",
     oldNames: [] },
   { file: "listen/deutsch-schweiz-150.txt", lang: "de", from: "zh",
     name: "Deutsch (Schweiz) – 150 Grundwörter · 瑞士德语基础词汇",
@@ -369,8 +426,14 @@ function save() {
    running session keeps its card objects and just sees updated counters. */
 // Sync only runs on the home server (tailnet host). Anywhere else – a local
 // copy, GitHub Pages – progress simply stays in this browser's localStorage.
-const API = /^100\.|\.ts\.net$/.test(location.hostname)
-  ? location.protocol + "//" + location.hostname + ":3010" : null;
+// Over https (tailscale serve, needed for the microphone) the APIs sit under
+// paths of the same origin – plain-http :3010 would be blocked as mixed content.
+const ON_HOME = /^100\.|\.ts\.net$/.test(location.hostname);
+const HTTPS = location.protocol === "https:";
+const API = !ON_HOME ? null : HTTPS ? location.origin + "/vapi"
+  : location.protocol + "//" + location.hostname + ":3010";
+const PRON = ON_HOME && HTTPS ? location.origin + "/pron" : null;
+const SPEAK_URL = "https://openclaw.tailf61f47.ts.net:8447/vokabeln/";
 let pushTimer = null, syncing = false, syncAgain = false, syncState = { status: "idle", at: 0 };
 
 function setSync(status) {
@@ -420,6 +483,12 @@ function mergeInto(local, remote) {
         changed = true;
       }
     });
+  });
+  // pronunciation stats: per "de|a" key, newer stamp wins
+  Object.keys(remote.pron || {}).forEach(k => {
+    if (!local.pron) local.pron = {};
+    const r = remote.pron[k], l = local.pron[k];
+    if (!l || (r.t || 0) > (l.t || 0)) { local.pron[k] = r; changed = true; }
   });
   (remote.autoAdded || []).forEach(f => {
     if (!Array.isArray(local.autoAdded)) local.autoAdded = [];
@@ -483,7 +552,7 @@ function mkDeck(id, name, lang, pairs) {
 
 /* ============================ Navigation ============================ */
 function go(name) {
-  ["home", "edit", "study", "sum", "prog"].forEach(s =>
+  ["home", "edit", "study", "sum", "prog", "speak"].forEach(s =>
     document.getElementById(s).classList.toggle("hidden", s !== name));
   if (name === "home") renderHome();
   window.scrollTo(0, 0);
@@ -536,7 +605,9 @@ function renderHome() {
     const b1 = mkBtn("Learn", "primary", () => startSession(d.id));
     const b2 = mkBtn("Progress", "", () => openProgress(d.id));
     const b3 = mkBtn("Edit", "ghost", () => openEditor(d.id));
-    el.append(b1, b2, b3);
+    el.append(b1);
+    if (TTS_LANG[d.lang]) el.append(mkBtn("Speak", "", () => startSpeak(d.id)));
+    el.append(b2, b3);
     wrap.appendChild(el);
   });
 }
@@ -1299,6 +1370,242 @@ function quitStudy() {
   go("home");
 }
 
+/* ============================ Speak (pronunciation) ============================
+   Read the answer side out loud: the phone's voice says it first, you record
+   yourself, the home server (Whisper + a phoneme recogniser on the GPU) says
+   which words came across and which typical sounds were off. Needs the https
+   address – browsers only hand out the microphone on secure pages. */
+const TTS_LANG = { pt: "pt-BR", es: "es-ES", de: "de-DE", fr: "fr-FR", it: "it-IT", en: "en-US" };
+const SPEAK_ROUND = 10;   // phrases per speaking run
+const SPEAK_GOOD = 85;    // score from which a phrase counts as "sits"
+let SP = null;
+
+function pronKey(c) { return c.de + "|" + c.a; }
+function pronOf(c) { return (db.pron || {})[pronKey(c)]; }
+
+function startSpeak(deckId) {
+  const d = deckById(deckId);
+  if (!d || !d.cards.length) return;
+  // list order, but phrases that already sound right go to the back
+  const order = d.cards.map((c, i) => ({ c: c, i: i, best: (pronOf(c) || {}).best || 0 }));
+  order.sort((x, y) => (x.best >= SPEAK_GOOD) - (y.best >= SPEAK_GOOD) || x.i - y.i);
+  SP = { deckId: deckId, lang: d.lang, items: order.slice(0, SPEAK_ROUND).map(x => x.c),
+         i: 0, best: {}, stream: null, rec: null, mine: null, busy: false };
+  go("speak");
+  showSpk();
+}
+
+function spkTargetText() { return alternatives(SP.items[SP.i].a)[0]; }
+
+function showSpk() {
+  const c = SP.items[SP.i];
+  $("spkCard").className = "card";
+  $("spkTarget").textContent = spkTargetText();
+  $("spkDe").textContent = c.de;
+  $("spkRes").className = "spk-res hidden";
+  $("spkRes").innerHTML = "";
+  $("spkMine").classList.add("hidden");
+  $("spkNext").textContent = "Skip";
+  $("spkNext").className = "ghost";
+  $("spkBar").style.width = Math.round(SP.i / SP.items.length * 100) + "%";
+  $("spkCounter").textContent = (SP.i + 1) + " / " + SP.items.length;
+  const p = pronOf(c);
+  $("spkLine").textContent = p ? "Your best so far: " + p.best + " · tried " + plural(p.n, "time", "times") : "First time for this one";
+  const mic = $("micBtn");
+  if (!PRON) {
+    mic.disabled = true;
+    mic.textContent = "🎤 Needs the secure link";
+    $("spkHint").innerHTML = 'The microphone only works on the https address: <a style="color:#7fb3ff" href="' +
+      SPEAK_URL + '">' + SPEAK_URL.replace("https://", "") + "</a> (Tailscale on). Listening works here too.";
+  } else {
+    mic.disabled = false;
+    mic.className = "mic";
+    mic.textContent = "🎤 Tap and speak";
+    $("spkHint").textContent = "Listen first, then tap the mic, say it, tap again to stop.";
+  }
+  sayIt(1);
+}
+
+function ttsVoice(lang) {
+  const want = (TTS_LANG[lang] || lang).toLowerCase();
+  const vs = speechSynthesis.getVoices().map(v => ({ v: v, l: v.lang.replace("_", "-").toLowerCase() }));
+  const hit = vs.find(x => x.l === want) || vs.find(x => x.l.slice(0, 2) === want.slice(0, 2));
+  return hit ? hit.v : null;
+}
+function sayIt(rate) {
+  if (!SP || !window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(spkTargetText());
+  u.lang = TTS_LANG[SP.lang] || SP.lang;
+  const v = ttsVoice(SP.lang);
+  if (v) u.voice = v;
+  u.rate = rate;
+  speechSynthesis.speak(u);
+}
+function playMine() { if (SP && SP.mine) new Audio(SP.mine).play(); }
+
+async function toggleRec() {
+  if (!SP || !PRON || SP.busy) return;
+  if (SP.rec && SP.rec.state === "recording") { SP.rec.stop(); return; }
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  try {
+    if (!SP.stream) SP.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    $("spkHint").textContent = "No microphone access — allow it for this page in the browser settings.";
+    return;
+  }
+  const chunks = [];
+  const rec = new MediaRecorder(SP.stream);
+  SP.rec = rec;
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  rec.onstop = () => {
+    clearTimeout(SP.recTimer);
+    sendRec(new Blob(chunks, { type: rec.mimeType || "audio/webm" }));
+  };
+  rec.start();
+  SP.recTimer = setTimeout(() => { if (rec.state === "recording") rec.stop(); }, 12000);
+  $("micBtn").className = "mic rec";
+  $("micBtn").textContent = "■ Tap to stop";
+  $("spkHint").textContent = "Recording … speak now.";
+}
+
+function sendRec(blob) {
+  const session = SP, item = SP.i;
+  if (SP.mine) URL.revokeObjectURL(SP.mine);
+  SP.mine = URL.createObjectURL(blob);
+  SP.busy = true;
+  const mic = $("micBtn");
+  mic.className = "mic"; mic.disabled = true; mic.textContent = "Listening to you …";
+  const url = PRON + "/check?lang=" + encodeURIComponent(SP.lang) + "&text=" + encodeURIComponent(spkTargetText());
+  fetch(url, { method: "POST", body: blob, headers: { "Content-Type": blob.type || "application/octet-stream" } })
+    .then(r => r.json())
+    .then(res => { if (SP === session && SP.i === item) showSpkResult(res); })
+    .catch(() => { if (SP === session) showSpkResult({ error: "server not reachable" }); })
+    .then(() => {
+      if (SP !== session) return;
+      SP.busy = false;
+      mic.disabled = false; mic.textContent = "🎤 Try again";
+    });
+}
+
+/* split the shown phrase the same way the server does, keeping its casing */
+function spkWordsHtml(text, verdicts) {
+  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const re = /[\p{L}\p{N}_'’-]+/gu;
+  const found = text.match(re) || [];
+  if (found.length !== verdicts.length) {
+    return verdicts.map(w => '<span class="w ' + w.ok + '">' + esc(w.w) + "</span>").join(" ");
+  }
+  let k = 0, out = "", last = 0, m;
+  while ((m = re.exec(text))) {
+    out += esc(text.slice(last, m.index)) + '<span class="w ' + verdicts[k++].ok + '">' + esc(m[0]) + "</span>";
+    last = m.index + m[0].length;
+  }
+  return out + esc(text.slice(last));
+}
+
+function showSpkResult(res) {
+  const box = $("spkRes");
+  box.className = "spk-res";
+  $("spkMine").classList.remove("hidden");
+  if (res.error) {
+    box.innerHTML = '<div class="tip"><b>Hmm</b></div>';
+    box.querySelector(".tip").append(res.error);
+    $("spkHint").textContent = "Tap the mic and try again.";
+    return;
+  }
+  const c = SP.items[SP.i];
+  const cls = res.score >= SPEAK_GOOD ? "good" : res.score >= 60 ? "warn" : "bad";
+  $("spkCard").className = "card " + (cls === "good" ? "ok" : cls === "warn" ? "typo" : "bad");
+  $("spkTarget").innerHTML = spkWordsHtml(spkTargetText(), res.words);
+
+  box.innerHTML =
+    '<div class="spk-score ' + cls + '">' + res.score + '<small style="font-size:.8rem;color:#8a93a3;font-weight:400"> / 100 · ' +
+      res.understood + " of " + res.words.length + " words came across</small></div>" +
+    '<div class="spk-heard">Heard: <b></b></div>';
+  box.querySelector(".spk-heard b").textContent = res.heard || "(nothing)";
+  (res.tips || []).forEach(t => {
+    const d = document.createElement("div");
+    d.className = "tip";
+    d.innerHTML = "<b></b>";
+    d.querySelector("b").textContent = t.sound;
+    d.append(t.tip);
+    box.appendChild(d);
+  });
+  if (!(res.tips || []).length && res.score >= SPEAK_GOOD) {
+    const d = document.createElement("div"); d.className = "spk-heard"; d.textContent = "Sounds right — no typical Spanish-speaker traps caught.";
+    box.appendChild(d);
+  }
+  const det = document.createElement("details");
+  det.className = "spk-ipa";
+  det.innerHTML = "<summary>sounds in detail (" + res.phones.acc + "% match)</summary><div></div><div></div>";
+  det.querySelectorAll("div")[0].textContent = "expected: " + res.phones.expected;
+  det.querySelectorAll("div")[1].textContent = "you:      " + res.phones.heard;
+  box.appendChild(det);
+
+  // keep the stats: best and last score per phrase, synced with the rest
+  if (!db.pron) db.pron = {};
+  const k = pronKey(c), p = db.pron[k] || { n: 0, best: 0, last: 0 };
+  db.pron[k] = { n: p.n + 1, best: Math.max(p.best, res.score), last: res.score, t: Date.now() };
+  SP.best[k] = Math.max(SP.best[k] || 0, res.score);
+  save();
+
+  $("spkNext").textContent = SP.i + 1 < SP.items.length ? "Next" : "Finish";
+  $("spkNext").className = "primary";
+  $("spkHint").textContent = "Compare ▶ Listen with ▶ Me, try again until it's green, or move on.";
+  box.scrollIntoView({ block: "nearest" });
+}
+
+function spkNext() {
+  if (!SP || SP.busy) return;
+  if (SP.rec && SP.rec.state === "recording") { SP.rec.onstop = null; SP.rec.stop(); }
+  SP.i++;
+  if (SP.i < SP.items.length) return showSpk();
+  finishSpeak();
+}
+function stopMic() {
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  if (!SP) return;
+  if (SP.rec && SP.rec.state === "recording") { SP.rec.onstop = null; SP.rec.stop(); }
+  if (SP.stream) SP.stream.getTracks().forEach(t => t.stop());
+  SP.stream = null;
+}
+function finishSpeak() {
+  stopMic();
+  const rows = SP.items.map(c => ({ c: c, s: SP.best[pronKey(c)] }));
+  const tried = rows.filter(r => r.s !== undefined);
+  const avg = tried.length ? Math.round(tried.reduce((s, r) => s + r.s, 0) / tried.length) : 0;
+  const good = tried.filter(r => r.s >= SPEAK_GOOD).length;
+  $("sumTitle").textContent = "Speaking run done";
+  $("sumSub").textContent = plural(tried.length, "phrase", "phrases") + " spoken · " + good + " sound right";
+  $("sumStats").innerHTML =
+    tile(tried.length ? avg : "–", "average score", tried.length ? accClass(avg) : "") +
+    tile(good + "/" + tried.length, "at " + SPEAK_GOOD + "+", good ? "good" : "");
+  const wrap = $("sumWordsWrap"), tb = $("sumWords");
+  wrap.classList.remove("hidden");
+  $("sumWordsTitle").textContent = "Your best take per phrase";
+  tb.innerHTML = "";
+  rows.sort((a, b) => (a.s === undefined) - (b.s === undefined) || (a.s || 0) - (b.s || 0)).forEach(r => {
+    const tr = document.createElement("tr");
+    const td1 = document.createElement("td"); td1.className = "t"; td1.textContent = alternatives(r.c.a)[0];
+    const td2 = document.createElement("td"); td2.className = "de"; td2.textContent = r.c.de;
+    const td3 = document.createElement("td");
+    td3.className = "n " + (r.s === undefined ? "" : r.s >= SPEAK_GOOD ? "ok" : r.s >= 60 ? "typo" : "bad");
+    td3.textContent = r.s === undefined ? "skipped" : r.s;
+    tr.append(td1, td2, td3);
+    tb.appendChild(tr);
+  });
+  const deckId = SP.deckId;
+  const btns = $("sumButtons");
+  btns.innerHTML = "";
+  btns.append(mkBtn("Next 10 phrases", "primary", () => startSpeak(deckId)),
+              mkBtn("Back to overview", "ghost", () => go("home")));
+  SP = null;
+  go("sum");
+}
+function quitSpeak() { stopMic(); SP = null; go("home"); }
+if (window.speechSynthesis) speechSynthesis.onvoiceschanged = () => {};   // Chrome loads voices lazily
+
 /* ============================ Input ============================ */
 function buildAccents(lang) {
   const wrap = $("accents");
@@ -1344,12 +1651,18 @@ answerEl.addEventListener("keydown", e => {
   act();
 });
 document.addEventListener("keydown", e => {
+  if (SP && !$("speak").classList.contains("hidden")) {
+    if (e.key === "Escape") quitSpeak();
+    else if (e.key === " ") { e.preventDefault(); toggleRec(); }
+    else if (e.key === "Enter" && !$("spkRes").classList.contains("hidden")) { e.preventDefault(); spkNext(); }
+    return;
+  }
   if (!S || $("study").classList.contains("hidden")) return;
   if (e.key === "Enter" && (S.phase === "correct" || S.phase === "confirm")) { e.preventDefault(); nextCard(); }
   if (e.key === "Escape") quitStudy();
 });
 
-const VERSION = "v24 · 2026-10-27";
+const VERSION = "v25 · 2026-10-28";
 $("version").textContent =
   VERSION + " — if you see something else here, your browser is still on the old page (reload).";
 $("rules").textContent =
