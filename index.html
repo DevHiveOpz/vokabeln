@@ -155,6 +155,13 @@
   .spk-heard b { color: #fff; font-weight: 500; }
   .tip { background: #141920; border: 1px solid #262e3a; border-left: 3px solid #d9a441; border-radius: 8px; padding: .55rem .7rem; margin-top: .5rem; }
   .tip b { color: #e0bb72; font-weight: 600; margin-right: .35rem; }
+  .spk-break { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .7rem; }
+  .spk-break .sw { background: #141920; border: 1px solid #262e3a; border-radius: 8px; padding: .3rem .55rem; text-align: center; }
+  .spk-break .ss { font-size: 1.05rem; letter-spacing: .02em; color: #9fb0c4; }
+  .spk-break .ss i { font-style: normal; color: #ff8b76; font-weight: 600; text-decoration: underline; text-underline-offset: .2em; }
+  .spk-break small { display: block; font-size: .72rem; color: #8a93a3; font-variant-numeric: tabular-nums; }
+  .spk-break small.good { color: #7fd39b; } .spk-break small.warn { color: #e0bb72; } .spk-break small.bad { color: #ff8b76; }
+  .tip .in { color: #8a93a3; font-size: .8rem; }
   .spk-ipa { font-size: .74rem; color: #6f7888; margin-top: .6rem; font-family: ui-monospace, Menlo, monospace; word-break: break-word; }
   .spk-ipa summary { cursor: pointer; }
 
@@ -1452,7 +1459,10 @@ async function toggleRec() {
   if (SP.rec && SP.rec.state === "recording") { SP.rec.stop(); return; }
   if (window.speechSynthesis) speechSynthesis.cancel();
   try {
-    if (!SP.stream) SP.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // a fresh stream for every take: on iPhone an open stream goes silent as soon
+    // as the page plays audio (▶ Listen), and the next take arrives empty
+    if (SP.stream) SP.stream.getTracks().forEach(t => t.stop());
+    SP.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (e) {
     $("spkHint").textContent = "No microphone access (" + (e.name || e.message) + ") — on iPhone: Settings → Safari → Microphone → Allow, then reload.";
     return;
@@ -1468,9 +1478,16 @@ async function toggleRec() {
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   rec.onstop = () => {
     clearTimeout(SP.recTimer);
-    sendRec(new Blob(chunks, { type: rec.mimeType || "audio/webm" }));
+    if (SP.stream) { SP.stream.getTracks().forEach(t => t.stop()); SP.stream = null; }
+    const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+    if (!blob.size) {
+      $("micBtn").className = "mic"; $("micBtn").textContent = "🎤 Tap and speak";
+      $("spkHint").textContent = "No sound came through — tap the mic and try once more.";
+      return;
+    }
+    sendRec(blob);
   };
-  rec.start();
+  rec.start(250);
   SP.recTimer = setTimeout(() => { if (rec.state === "recording") rec.stop(); }, 12000);
   $("micBtn").className = "mic rec";
   $("micBtn").textContent = "■ Tap to stop";
@@ -1528,16 +1545,49 @@ function showSpkResult(res) {
   $("spkTarget").innerHTML = spkWordsHtml(spkTargetText(), res.words);
 
   box.innerHTML =
-    '<div class="spk-score ' + cls + '">' + res.score + '<small style="font-size:.8rem;color:#8a93a3;font-weight:400"> / 100 · ' +
+    '<div class="spk-score ' + cls + '">' + res.score + '%<small style="font-size:.8rem;color:#8a93a3;font-weight:400"> · ' +
       res.understood + " of " + res.words.length + " words came across</small></div>" +
     '<div class="spk-heard">Heard: <b></b></div>';
   box.querySelector(".spk-heard b").textContent = res.heard || "(nothing)";
+
+  // sound by sound, per word: red = the part that came out wrong
+  const detail = (res.phones && res.phones.detail) || [];
+  const wordsShown = spkTargetText().match(/[\p{L}\p{N}_'’-]+/gu) || [];
+  if (detail.length) {
+    const lab = document.createElement("div");
+    lab.className = "hintline"; lab.style.marginTop = ".9rem";
+    lab.textContent = "Sound by sound — red is the part that was off:";
+    const brk = document.createElement("div");
+    brk.className = "spk-break";
+    detail.forEach((w, i) => {
+      const el = document.createElement("div");
+      el.className = "sw";
+      const ss = document.createElement("div");
+      ss.className = "ss";
+      w.sounds.forEach(x => {
+        if (x.ok) ss.append(x.s);
+        else { const b = document.createElement("i"); b.textContent = x.s; ss.append(b); }
+      });
+      const sm = document.createElement("small");
+      sm.className = w.pct >= 80 ? "good" : w.pct >= 50 ? "warn" : "bad";
+      sm.textContent = (detail.length === wordsShown.length ? wordsShown[i] + " · " : "") + w.pct + "%";
+      el.append(ss, sm);
+      brk.appendChild(el);
+    });
+    box.append(lab, brk);
+  }
   (res.tips || []).forEach(t => {
     const d = document.createElement("div");
     d.className = "tip";
     d.innerHTML = "<b></b>";
     d.querySelector("b").textContent = t.sound;
     d.append(t.tip);
+    if (t.words && detail.length === wordsShown.length) {
+      const inw = document.createElement("div");
+      inw.className = "in";
+      inw.textContent = "in: " + t.words.map(i => wordsShown[i]).join(", ");
+      d.appendChild(inw);
+    }
     box.appendChild(d);
   });
   if (!(res.tips || []).length && res.score >= SPEAK_GOOD) {
@@ -1670,7 +1720,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") quitStudy();
 });
 
-const VERSION = "v26 · 2026-10-28";
+const VERSION = "v27 · 2026-10-28";
 $("version").textContent =
   VERSION + " — if you see something else here, your browser is still on the old page (reload).";
 $("rules").textContent =
