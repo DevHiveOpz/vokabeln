@@ -1384,6 +1384,9 @@ function pronKey(c) { return c.de + "|" + c.a; }
 function pronOf(c) { return (db.pron || {})[pronKey(c)]; }
 
 function startSpeak(deckId) {
+  // on the old http address the browser won't hand out the mic: hop to https
+  // (progress follows via the server sync)
+  if (ON_HOME && !HTTPS) { location.href = SPEAK_URL; return; }
   const d = deckById(deckId);
   if (!d || !d.cards.length) return;
   // list order, but phrases that already sound right go to the back
@@ -1451,11 +1454,16 @@ async function toggleRec() {
   try {
     if (!SP.stream) SP.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (e) {
-    $("spkHint").textContent = "No microphone access — allow it for this page in the browser settings.";
+    $("spkHint").textContent = "No microphone access (" + (e.name || e.message) + ") — on iPhone: Settings → Safari → Microphone → Allow, then reload.";
     return;
   }
   const chunks = [];
-  const rec = new MediaRecorder(SP.stream);
+  let rec;
+  try { rec = new MediaRecorder(SP.stream); }
+  catch (e) {
+    $("spkHint").textContent = "This browser can't record audio here (" + e.message + "). Try Safari or Chrome, not an in-app browser.";
+    return;
+  }
   SP.rec = rec;
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   rec.onstop = () => {
@@ -1662,7 +1670,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") quitStudy();
 });
 
-const VERSION = "v25 · 2026-10-28";
+const VERSION = "v26 · 2026-10-28";
 $("version").textContent =
   VERSION + " — if you see something else here, your browser is still on the old page (reload).";
 $("rules").textContent =
