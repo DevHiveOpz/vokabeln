@@ -162,6 +162,11 @@
   .spk-break small { display: block; font-size: .72rem; color: #8a93a3; font-variant-numeric: tabular-nums; }
   .spk-break small.good { color: #7fd39b; } .spk-break small.warn { color: #e0bb72; } .spk-break small.bad { color: #ff8b76; }
   .tip .in { color: #8a93a3; font-size: .8rem; }
+  .ear-opts { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; margin-top: 1rem; }
+  .ear-opts button { min-height: 92px; font-size: 1.6rem; font-weight: 600; }
+  .ear-opts button.ok { background: #1d3a29; border-color: #3fb96b; color: #7fd39b; }
+  .ear-opts button.bad { background: #3a1f1d; border-color: #d95f4a; color: #ff8b76; }
+  .ear-opts button:disabled { cursor: default; }
   .spk-ipa { font-size: .74rem; color: #6f7888; margin-top: .6rem; font-family: ui-monospace, Menlo, monospace; word-break: break-word; }
   .spk-ipa summary { cursor: pointer; }
 
@@ -197,6 +202,7 @@
   <h1>Vocab Trainer</h1>
   <p class="sub">See the word, type the translation, fix mistakes on the spot.</p>
 
+  <div id="earHome"></div>
   <h2>My lists</h2>
   <div id="deckList"></div>
 
@@ -280,6 +286,7 @@
       <button onclick="sayIt(1)">▶ Listen</button>
       <button onclick="sayIt(0.6)">🐢 Slow</button>
       <button id="spkMine" class="hidden" onclick="playMine()">▶ Me</button>
+      <button id="spkCmp" class="hidden" onclick="playCompare()">⇄ Compare</button>
     </div>
     <button class="mic" id="micBtn" onclick="toggleRec()">🎤 Tap and speak</button>
     <div class="spk-res hidden" id="spkRes"></div>
@@ -288,6 +295,29 @@
       <button id="spkNext" class="ghost" onclick="spkNext()">Skip</button>
     </div>
     <p class="hintline" id="spkHint">Listen first, then tap the mic, say it, tap again to stop.</p>
+  </div>
+</section>
+
+<!-- ======================= EAR TRAINING ======================= -->
+<section id="ear" class="hidden">
+  <div class="topbar">
+    <button class="ghost" onclick="quitEar()" title="Back to overview (Esc)">←</button>
+    <div class="prog"><i id="earBar"></i></div>
+    <div class="counter" id="earCounter"></div>
+  </div>
+  <div class="roundline" id="earLine"></div>
+  <div class="card" id="earCard">
+    <div class="qlabel">Which word did you hear?</div>
+    <div class="ear-opts" id="earOpts"></div>
+    <div class="spk-tools" style="margin-top:1rem">
+      <button onclick="earPlay()">▶ Play again</button>
+      <button id="earA" class="hidden"></button>
+      <button id="earB" class="hidden"></button>
+    </div>
+    <div class="fb hidden" id="earFb"></div>
+    <div class="row" style="margin-top:1rem"><span class="spacer"></span>
+      <button id="earNext" class="hidden primary" onclick="earNext()">Next</button></div>
+    <p class="hintline" id="earHint">Different Brazilian voices each time. Listen, then tap the word you heard.</p>
   </div>
 </section>
 
@@ -491,12 +521,12 @@ function mergeInto(local, remote) {
       }
     });
   });
-  // pronunciation stats: per "de|a" key, newer stamp wins
-  Object.keys(remote.pron || {}).forEach(k => {
-    if (!local.pron) local.pron = {};
-    const r = remote.pron[k], l = local.pron[k];
-    if (!l || (r.t || 0) > (l.t || 0)) { local.pron[k] = r; changed = true; }
-  });
+  // pronunciation + ear-training stats: per key, newer stamp wins
+  ["pron", "ear"].forEach(f => Object.keys(remote[f] || {}).forEach(k => {
+    if (!local[f]) local[f] = {};
+    const r = remote[f][k], l = local[f][k];
+    if (!l || (r.t || 0) > (l.t || 0)) { local[f][k] = r; changed = true; }
+  }));
   (remote.autoAdded || []).forEach(f => {
     if (!Array.isArray(local.autoAdded)) local.autoAdded = [];
     if (local.autoAdded.indexOf(f) < 0) { local.autoAdded.push(f); changed = true; }
@@ -559,7 +589,7 @@ function mkDeck(id, name, lang, pairs) {
 
 /* ============================ Navigation ============================ */
 function go(name) {
-  ["home", "edit", "study", "sum", "prog", "speak"].forEach(s =>
+  ["home", "edit", "study", "sum", "prog", "speak", "ear"].forEach(s =>
     document.getElementById(s).classList.toggle("hidden", s !== name));
   if (name === "home") renderHome();
   window.scrollTo(0, 0);
@@ -592,6 +622,7 @@ function legendHtml(d) {
 }
 function renderHome() {
   renderSync();
+  renderEarHome();
   const wrap = $("deckList");
   if (!db.decks.length) { wrap.innerHTML = '<p class="sub">No lists yet. Create one or import a file.</p>'; return; }
   wrap.innerHTML = "";
@@ -1414,7 +1445,8 @@ function startSpeak(deckId, from, only) {
   }
   SP = { deckId: deckId, lang: d.lang, items: items.map(x => x.c),
          next: items.length ? items[items.length - 1].i + 1 : 0,
-         i: 0, best: {}, stream: null, rec: null, mine: null, busy: false };
+         i: 0, best: {}, stream: null, rec: null, mine: null, busy: false,
+         requeued: {}, touched: 0 };
   go("speak");
   showSpk();
 }
@@ -1429,12 +1461,14 @@ function showSpk() {
   $("spkRes").className = "spk-res hidden";
   $("spkRes").innerHTML = "";
   $("spkMine").classList.add("hidden");
+  $("spkCmp").classList.add("hidden");
   $("spkNext").textContent = "Skip";
   $("spkNext").className = "ghost";
   $("spkBar").style.width = Math.round(SP.i / SP.items.length * 100) + "%";
   $("spkCounter").textContent = (SP.i + 1) + " / " + SP.items.length;
   const p = pronOf(c);
-  $("spkLine").textContent = p ? "Your best so far: " + p.best + " · tried " + plural(p.n, "time", "times") : "First time for this one";
+  $("spkLine").textContent = (SP.second && SP.second[SP.i] ? "Second chance · " : "") +
+    (p ? "your best so far: " + p.best + "% · tried " + plural(p.n, "time", "times") : "first time for this one");
   const mic = $("micBtn");
   if (!PRON) {
     mic.disabled = true;
@@ -1456,7 +1490,30 @@ function ttsVoice(lang) {
   const hit = vs.find(x => x.l === want) || vs.find(x => x.l.slice(0, 2) === want.slice(0, 2));
   return hit ? hit.v : null;
 }
+/* One audio element for everything (native voice, your take, compare): iPhone only
+   lets a page play sound from an element that was first started by a tap. */
+const player = new Audio();
+player.preload = "auto";
+function nativeUrl(text, voice, speed) {
+  return PRON + "/tts?text=" + encodeURIComponent(text) + "&voice=" + voice + (speed ? "&speed=" + speed : "");
+}
+function playUrl(url, then) {
+  player.onended = then || null;
+  player.onerror = null;
+  player.src = url;
+  return player.play();
+}
 function sayIt(rate) {
+  if (!SP) return;
+  SP.touched = Date.now();
+  if (PRON) {
+    // the voice changes from phrase to phrase: hearing several speakers trains the ear better
+    playUrl(nativeUrl(spkTargetText(), SP.i % 3, rate < 1 ? 0.7 : 0)).catch(() => phoneSay(rate));
+    return;
+  }
+  phoneSay(rate);
+}
+function phoneSay(rate) {
   if (!SP || !window.speechSynthesis) return;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(spkTargetText());
@@ -1466,12 +1523,21 @@ function sayIt(rate) {
   u.rate = rate;
   speechSynthesis.speak(u);
 }
-function playMine() { if (SP && SP.mine) new Audio(SP.mine).play(); }
+function playMine() { if (SP && SP.mine) { SP.touched = Date.now(); playUrl(SP.mine); } }
+/* record-and-compare: the native voice, then you, back to back */
+function playCompare() {
+  if (!SP || !SP.mine) return;
+  SP.touched = Date.now();
+  const mine = SP.mine;
+  playUrl(nativeUrl(spkTargetText(), SP.i % 3), () => setTimeout(() => playUrl(mine), 350));
+}
 
 async function toggleRec() {
   if (!SP || !PRON || SP.busy) return;
+  SP.touched = Date.now();
   if (SP.rec && SP.rec.state === "recording") { SP.rec.stop(); return; }
   if (window.speechSynthesis) speechSynthesis.cancel();
+  player.pause();
   try {
     // a fresh stream for every take: on iPhone an open stream goes silent as soon
     // as the page plays audio (▶ Listen), and the next take arrives empty
@@ -1554,6 +1620,7 @@ function showSpkResult(res) {
   const box = $("spkRes");
   box.className = "spk-res";
   $("spkMine").classList.remove("hidden");
+  $("spkCmp").classList.toggle("hidden", !PRON);
   if (res.error) {
     box.innerHTML = '<div class="tip"><b>Hmm</b></div>';
     box.querySelector(".tip").append(res.error);
@@ -1567,6 +1634,7 @@ function showSpkResult(res) {
 
   box.innerHTML =
     '<div class="spk-score ' + cls + '">' + res.score + '%<small style="font-size:.8rem;color:#8a93a3;font-weight:400"> · ' +
+      (res.native != null ? "sounds " + res.native + "% like the native voices · " : "") +
       res.understood + " of " + res.words.length + " words came across</small></div>" +
     '<div class="spk-heard">Heard: <b></b></div>';
   box.querySelector(".spk-heard b").textContent = res.heard || "(nothing)";
@@ -1631,19 +1699,37 @@ function showSpkResult(res) {
 
   $("spkNext").textContent = SP.i + 1 < SP.items.length ? "Next" : "Finish";
   $("spkNext").className = "primary";
-  $("spkHint").textContent = "Compare ▶ Listen with ▶ Me, try again until it's green, or move on.";
   box.scrollIntoView({ block: "nearest" });
+  if (res.score >= SPEAK_GOOD) {
+    // green: move on by itself unless you start listening / comparing
+    $("spkHint").textContent = "✓ Sounds right — next one in a moment (tap anything to stay).";
+    const session = SP, item = SP.i, stamp = Date.now();
+    SP.touched = stamp;
+    setTimeout(() => { if (SP === session && SP.i === item && SP.touched === stamp && !SP.busy) spkNext(); }, 1800);
+  } else {
+    $("spkHint").textContent = "Tap ⇄ Compare to hear the native voice and then yourself, fix the red part, try again.";
+  }
 }
 
 function spkNext() {
   if (!SP || SP.busy) return;
   if (SP.rec && SP.rec.state === "recording") { SP.rec.onstop = null; SP.rec.stop(); }
+  player.pause();
+  // a phrase that wasn't green comes back once at the end of the run – the spacing helps
+  const c = SP.items[SP.i], k = pronKey(c);
+  if (SP.best[k] !== undefined && SP.best[k] < SPEAK_GOOD && !SP.requeued[k]) {
+    SP.requeued[k] = true;
+    SP.items.push(c);
+    if (!SP.second) SP.second = {};
+    SP.second[SP.items.length - 1] = true;
+  }
   SP.i++;
   if (SP.i < SP.items.length) return showSpk();
   finishSpeak();
 }
 function stopMic() {
   if (window.speechSynthesis) speechSynthesis.cancel();
+  player.pause();
   if (!SP) return;
   if (SP.rec && SP.rec.state === "recording") { SP.rec.onstop = null; SP.rec.stop(); }
   if (SP.stream) SP.stream.getTracks().forEach(t => t.stop());
@@ -1651,7 +1737,7 @@ function stopMic() {
 }
 function finishSpeak() {
   stopMic();
-  const rows = SP.items.map(c => ({ c: c, s: SP.best[pronKey(c)] }));
+  const rows = SP.items.filter((c, i) => SP.items.indexOf(c) === i).map(c => ({ c: c, s: SP.best[pronKey(c)] }));
   const tried = rows.filter(r => r.s !== undefined);
   const avg = tried.length ? Math.round(tried.reduce((s, r) => s + r.s, 0) / tried.length) : 0;
   const good = tried.filter(r => r.s >= SPEAK_GOOD).length;
@@ -1689,6 +1775,163 @@ function finishSpeak() {
   go("sum");
 }
 function quitSpeak() { stopMic(); SP = null; go("home"); }
+
+/* ============================ Ear training (minimal pairs) ============================
+   High-variability phonetic training – the best-backed method for hearing new sounds:
+   two real words that differ in one Spanish-speaker trap (carro/caro, avó/avô, mão/mau),
+   said by a random one of three Brazilian voices; tap which one you heard, get
+   right/wrong at once, replay both to hear the contrast. No pronunciation score here. */
+const EAR_ROUND = 20;
+let PAIRS = null, EAR = null;
+
+function loadPairs() {
+  if (PAIRS) return Promise.resolve(PAIRS);
+  return fetch("listen/minimal-pairs.txt", { cache: "no-cache" }).then(r => r.text()).then(txt => {
+    PAIRS = txt.split(/\r?\n/).filter(l => l.trim() && !l.startsWith("#")).map(l => {
+      const f = l.split("|").map(x => x.trim());
+      return { a: f[0], b: f[1], kind: f[2], hint: f[3], key: f[0] + "|" + f[1] };
+    });
+    return PAIRS;
+  });
+}
+function earStat(key) { return (db.ear || {})[key] || { n: 0, ok: 0 }; }
+
+function renderEarHome() {
+  const wrap = $("earHome");
+  if (!wrap) return;
+  if (!db.decks.some(d => d.lang === "pt")) { wrap.innerHTML = ""; return; }
+  const stats = Object.values(db.ear || {});
+  const n = stats.reduce((s, x) => s + x.n, 0), ok = stats.reduce((s, x) => s + x.ok, 0);
+  wrap.innerHTML = '<h2>Ear training</h2><div class="deck"><div class="deckmain">' +
+    '<div class="name">👂 Hear the difference</div>' +
+    '<div class="hint">Minimal pairs, three Brazilian voices: carro/caro, avó/avô, mão/mau, vela/bela …' +
+    (n ? " · " + n + " heard · " + pct(ok, n) + "% right" : "") + "</div></div></div>";
+  wrap.querySelector(".deck").append(mkBtn("Train ear", "primary", startEar));
+}
+
+function startEar() {
+  if (ON_HOME && !HTTPS) { location.href = SPEAK_URL; return; }
+  if (!PRON) { alert("Ear training needs the home server (Tailscale on)."); return; }
+  loadPairs().then(pairs => {
+    // weakest pairs first (fewest right so far), a bit of shuffle so it never feels fixed
+    const order = pairs.map(p => {
+      const st = earStat(p.key);
+      return { p: p, w: (st.ok + 1) / (st.n + 2) + Math.random() * 0.25 };
+    }).sort((x, y) => x.w - y.w).map(x => x.p);
+    const trials = [];
+    for (let i = 0; trials.length < EAR_ROUND; i++) trials.push(order[i % order.length]);
+    EAR = { queue: shuffle(trials).map(p => ({ p: p, word: Math.random() < 0.5 ? p.a : p.b, voice: Math.floor(Math.random() * 3) })),
+            done: 0, right: 0, retried: {}, byKind: {}, phase: "ask" };
+    go("ear");
+    earShow();
+  });
+}
+
+function earShow() {
+  const t = EAR.queue[0];
+  EAR.phase = "ask";
+  $("earCard").className = "card";
+  $("earFb").className = "fb hidden";
+  $("earNext").classList.add("hidden");
+  $("earA").classList.add("hidden"); $("earB").classList.add("hidden");
+  $("earBar").style.width = Math.round(EAR.done / (EAR.done + EAR.queue.length) * 100) + "%";
+  $("earCounter").textContent = (EAR.done + 1) + " / " + (EAR.done + EAR.queue.length);
+  $("earLine").textContent = t.p.kind + (EAR.retried[EAR.done] ? " · again, from earlier" : "");
+  const opts = $("earOpts");
+  opts.innerHTML = "";
+  // fixed order (a left, b right) so the choice is about the sound, not the position
+  [t.p.a, t.p.b].forEach((w, i) => {
+    const b = mkBtn(w, "", () => earPick(w));
+    b.dataset.word = w;
+    opts.appendChild(b);
+  });
+  $("earHint").textContent = "Listen, then tap the word you heard. (Keys: 1 / 2, space = replay)";
+  earPlay();
+  // warm the next clip so there's no gap
+  if (EAR.queue[1]) fetch(nativeUrl(EAR.queue[1].word, EAR.queue[1].voice)).catch(() => {});
+}
+function earPlay(word) {
+  const t = EAR && EAR.queue[0];
+  if (!t) return;
+  playUrl(nativeUrl(word || t.word, t.voice)).catch(() => {});
+}
+
+function earPick(w) {
+  if (!EAR || EAR.phase !== "ask") return;
+  const t = EAR.queue[0], right = w === t.word;
+  EAR.phase = "answered";
+  const kind = EAR.byKind[t.p.kind] || (EAR.byKind[t.p.kind] = { n: 0, ok: 0 });
+  kind.n++; if (right) kind.ok++;
+  if (!db.ear) db.ear = {};
+  const st = earStat(t.p.key);
+  db.ear[t.p.key] = { n: st.n + 1, ok: st.ok + (right ? 1 : 0), t: Date.now() };
+  save();
+  $("earOpts").querySelectorAll("button").forEach(b => {
+    b.disabled = true;
+    if (b.dataset.word === t.word) b.className = "ok";
+    else if (b.dataset.word === w) b.className = "bad";
+  });
+  const fb = $("earFb");
+  fb.className = "fb " + (right ? "ok" : "bad");
+  fb.innerHTML = '<div class="head"></div><div class="yours"></div>';
+  fb.querySelector(".head").textContent = right ? "Right — it was " + t.word : "It was " + t.word;
+  fb.querySelector(".yours").textContent = t.p.hint;
+  $("earCard").className = "card " + (right ? "ok" : "bad");
+  // hear both, same voice, to feel the contrast
+  $("earA").textContent = "▶ " + t.p.a; $("earA").onclick = () => earPlay(t.p.a); $("earA").classList.remove("hidden");
+  $("earB").textContent = "▶ " + t.p.b; $("earB").onclick = () => earPlay(t.p.b); $("earB").classList.remove("hidden");
+  EAR.done++; if (right) EAR.right++;
+  EAR.queue.shift();
+  if (!right && !t.again) {
+    // missed: the same pair comes back a few trials later, with a fresh voice and word
+    const again = { p: t.p, word: Math.random() < 0.5 ? t.p.a : t.p.b, voice: (t.voice + 1) % 3, again: true };
+    const at = Math.min(EAR.queue.length, 3);
+    EAR.queue.splice(at, 0, again);
+    EAR.retried[EAR.done + at] = true;
+  }
+  if (right) {
+    $("earHint").textContent = "Next one in a moment …";
+    const e = EAR, stamp = EAR.done;
+    setTimeout(() => { if (EAR === e && EAR.done === stamp && EAR.phase === "answered") earNext(); }, 1100);
+  } else {
+    $("earNext").classList.remove("hidden");
+    $("earHint").textContent = "Play both a few times, then Next.";
+  }
+}
+function earNext() {
+  if (!EAR) return;
+  if (!EAR.queue.length) return finishEar();
+  earShow();
+}
+function finishEar() {
+  const e = EAR;
+  player.pause();
+  $("sumTitle").textContent = "Ear training done";
+  $("sumSub").textContent = e.right + " of " + e.done + " heard right";
+  const acc = pct(e.right, e.done);
+  $("sumStats").innerHTML = tile(acc + "%", "heard right", accClass(acc)) + tile(e.done, "words heard");
+  const wrap = $("sumWordsWrap"), tb = $("sumWords");
+  wrap.classList.remove("hidden");
+  $("sumWordsTitle").textContent = "By sound — weakest first";
+  tb.innerHTML = "";
+  Object.keys(e.byKind).map(k => ({ k: k, n: e.byKind[k].n, ok: e.byKind[k].ok }))
+    .sort((a, b) => a.ok / a.n - b.ok / b.n).forEach(r => {
+      const tr = document.createElement("tr");
+      const td1 = document.createElement("td"); td1.className = "t"; td1.textContent = r.k;
+      const td2 = document.createElement("td"); td2.className = "de";
+      const td3 = document.createElement("td"); const p = pct(r.ok, r.n);
+      td3.className = "n " + (p >= 80 ? "ok" : p >= 50 ? "typo" : "bad");
+      td3.textContent = r.ok + "/" + r.n;
+      tr.append(td1, td2, td3);
+      tb.appendChild(tr);
+    });
+  const btns = $("sumButtons");
+  btns.innerHTML = "";
+  btns.append(mkBtn("Another 20", "primary", startEar), mkBtn("Back to overview", "ghost", () => go("home")));
+  EAR = null;
+  go("sum");
+}
+function quitEar() { player.pause(); EAR = null; go("home"); }
 if (window.speechSynthesis) speechSynthesis.onvoiceschanged = () => {};   // Chrome loads voices lazily
 
 /* ============================ Input ============================ */
@@ -1736,6 +1979,13 @@ answerEl.addEventListener("keydown", e => {
   act();
 });
 document.addEventListener("keydown", e => {
+  if (EAR && !$("ear").classList.contains("hidden")) {
+    if (e.key === "Escape") quitEar();
+    else if (e.key === " ") { e.preventDefault(); earPlay(); }
+    else if ((e.key === "1" || e.key === "2") && EAR.phase === "ask") earPick(EAR.queue[0].p[e.key === "1" ? "a" : "b"]);
+    else if (e.key === "Enter" && EAR.phase === "answered") { e.preventDefault(); earNext(); }
+    return;
+  }
   if (SP && !$("speak").classList.contains("hidden")) {
     if (e.key === "Escape") quitSpeak();
     else if (e.key === " ") { e.preventDefault(); toggleRec(); }
@@ -1747,7 +1997,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") quitStudy();
 });
 
-const VERSION = "v29 · 2026-10-28";
+const VERSION = "v30 · 2026-10-28";
 $("version").textContent =
   VERSION + " — if you see something else here, your browser is still on the old page (reload).";
 $("rules").textContent =

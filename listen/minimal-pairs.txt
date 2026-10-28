@@ -1,0 +1,30 @@
+# Ear training: two real words that differ only in one Spanish-speaker trap.
+# word A | word B | contrast | what to listen for
+carro | caro | rr vs r | carro (car) = breathy h: KA-hu · caro (expensive) = quick tongue tap: KA-ru
+morro | moro | rr vs r | morro (hill) = h: MO-hu · moro (I live) = tap: MO-ru
+erra | era | rr vs r | erra (gets it wrong) = h · era (was) = tap
+corro | coro | rr vs r | corro (I run) = h · coro (choir) = tap
+avó | avô | open vs closed o | avó (grandma) = open ó, mouth wide · avô (grandpa) = closed ô, lips round
+vovó | vovô | open vs closed o | vovó = open ó · vovô = closed ô
+pode | pôde | open vs closed o | pode (can) = open ó · pôde (could) = closed ô
+mão | mau | nasal vs oral | mão (hand) = through the nose · mau (bad) = plain "mau"
+pão | pau | nasal vs oral | pão (bread) = nasal · pau (stick) = plain
+lã | lá | nasal vs oral | lã (wool) = nasal · lá (there) = plain open a
+vim | vi | nasal vs oral | vim (I came) = nasal i · vi (I saw) = plain i
+som | só | nasal vs oral | som (sound) = nasal o · só (only) = open plain ó
+sim | si | nasal vs oral | sim (yes) = nasal, lips stay open · si (oneself) = plain
+vela | bela | v vs b | vela (candle) = teeth on lip · bela (beautiful) = both lips
+vem | bem | v vs b | vem (comes) = v · bem (well) = b
+vala | bala | v vs b | vala (ditch) = v · bala (bullet / candy) = b
+casa | caça | z vs s | casa (house) = buzzing z · caça (hunt) = sharp s
+asa | assa | z vs s | asa (wing) = z · assa (bakes) = s
+rosa | roça | z vs s | rosa (rose) = z · roça (farm) = s
+zelo | selo | z vs s | zelo (care) = z · selo (stamp) = s
+mola | molha | l vs lh | mola (spring) = plain l · molha (wets) = lh, tongue flat: MO-lya
+vela | velha | l vs lh | vela (candle) = l · velha (old woman) = lh: VE-lya
+fila | filha | l vs lh | fila (queue) = l · filha (daughter) = lh: FI-lya
+mina | minha | n vs nh | mina (mine) = n · minha (my) = nh like ñ: MI-ña
+sono | sonho | n vs nh | sono (sleep) = n · sonho (dream) = nh: SO-ñu
+pena | penha | n vs nh | pena (pity) = n · penha (rock) = nh
+chá | já | sh vs zh | chá (tea) = sh, voiceless · já (already) = zh, buzzing
+chato | jato | sh vs zh | chato (annoying) = sh · jato (jet) = zh
