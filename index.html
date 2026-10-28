@@ -1390,16 +1390,30 @@ let SP = null;
 function pronKey(c) { return c.de + "|" + c.a; }
 function pronOf(c) { return (db.pron || {})[pronKey(c)]; }
 
-function startSpeak(deckId) {
+function startSpeak(deckId, from, only) {
   // on the old http address the browser won't hand out the mic: hop to https
   // (progress follows via the server sync)
   if (ON_HOME && !HTTPS) { location.href = SPEAK_URL; return; }
   const d = deckById(deckId);
   if (!d || !d.cards.length) return;
-  // list order, but phrases that already sound right go to the back
-  const order = d.cards.map((c, i) => ({ c: c, i: i, best: (pronOf(c) || {}).best || 0 }));
-  order.sort((x, y) => (x.best >= SPEAK_GOOD) - (y.best >= SPEAK_GOOD) || x.i - y.i);
-  SP = { deckId: deckId, lang: d.lang, items: order.slice(0, SPEAK_ROUND).map(x => x.c),
+  // Walk the list in order, 10 at a time, from where the last run stopped. Phrases that already sound right are skipped
+  // unless everything does – then it's a lap over the weakest ones.
+  from = from || 0;
+  const n = d.cards.length, pending = [];
+  const collect = start => {
+    for (let idx = start; idx < n && pending.length < SPEAK_ROUND; idx++)
+      if (((pronOf(d.cards[idx]) || {}).best || 0) < SPEAK_GOOD) pending.push({ c: d.cards[idx], i: idx });
+  };
+  collect(from);                       // a run never wraps: the last one is just shorter
+  if (!pending.length && from) collect(0);   // end of the list reached → start over at the top
+  let items = pending;
+  if (only && only.length) items = only.map(c => ({ c: c, i: d.cards.indexOf(c) }));
+  else if (!items.length) {
+    items = d.cards.map((c, i) => ({ c: c, i: i, best: (pronOf(c) || {}).best || 0 }))
+      .sort((x, y) => x.best - y.best).slice(0, SPEAK_ROUND);
+  }
+  SP = { deckId: deckId, lang: d.lang, items: items.map(x => x.c),
+         next: items.length ? items[items.length - 1].i + 1 : 0,
          i: 0, best: {}, stream: null, rec: null, mine: null, busy: false };
   go("speak");
   showSpk();
@@ -1502,10 +1516,17 @@ function sendRec(blob) {
   const mic = $("micBtn");
   mic.className = "mic"; mic.disabled = true; mic.textContent = "Listening to you …";
   const url = PRON + "/check?lang=" + encodeURIComponent(SP.lang) + "&text=" + encodeURIComponent(spkTargetText());
-  fetch(url, { method: "POST", body: blob, headers: { "Content-Type": blob.type || "application/octet-stream" } })
-    .then(r => r.json())
+  // one quiet retry: a server restart or a network blip shouldn't cost the take
+  const post = () => fetch(url, { method: "POST", body: blob, headers: { "Content-Type": blob.type || "application/octet-stream" } })
+    .then(r => r.json().catch(() => { throw new Error("HTTP " + r.status); }));
+  // retries spread over ~13 s: long enough to ride out a checker restart
+  const wait = ms => new Promise(ok => setTimeout(ok, ms));
+  post()
+    .catch(() => wait(2500).then(post))
+    .catch(() => wait(4000).then(post))
+    .catch(() => wait(6000).then(post))
     .then(res => { if (SP === session && SP.i === item) showSpkResult(res); })
-    .catch(() => { if (SP === session) showSpkResult({ error: "server not reachable" }); })
+    .catch(e => { if (SP === session) showSpkResult({ error: "couldn't reach the checker (" + e.message + ") — tap the mic to try again" }); })
     .then(() => {
       if (SP !== session) return;
       SP.busy = false;
@@ -1635,7 +1656,10 @@ function finishSpeak() {
   const avg = tried.length ? Math.round(tried.reduce((s, r) => s + r.s, 0) / tried.length) : 0;
   const good = tried.filter(r => r.s >= SPEAK_GOOD).length;
   $("sumTitle").textContent = "Speaking run done";
-  $("sumSub").textContent = plural(tried.length, "phrase", "phrases") + " spoken · " + good + " sound right";
+  const d = deckById(SP.deckId);
+  const allGood = d.cards.filter(c => ((pronOf(c) || {}).best || 0) >= SPEAK_GOOD).length;
+  $("sumSub").textContent = plural(tried.length, "phrase", "phrases") + " spoken · " + good + " sound right · " +
+    "whole list: " + allGood + " of " + d.cards.length + " sound right";
   $("sumStats").innerHTML =
     tile(tried.length ? avg : "–", "average score", tried.length ? accClass(avg) : "") +
     tile(good + "/" + tried.length, "at " + SPEAK_GOOD + "+", good ? "good" : "");
@@ -1653,10 +1677,13 @@ function finishSpeak() {
     tr.append(td1, td2, td3);
     tb.appendChild(tr);
   });
-  const deckId = SP.deckId;
+  const deckId = SP.deckId, next = SP.next;
+  const weak = rows.filter(r => r.s !== undefined && r.s < SPEAK_GOOD).map(r => r.c);
   const btns = $("sumButtons");
   btns.innerHTML = "";
-  btns.append(mkBtn("Next 10 phrases", "primary", () => startSpeak(deckId)),
+  btns.append(mkBtn(allGood === d.cards.length ? "Another lap" : "Next 10 phrases", "primary", () => startSpeak(deckId, next)));
+  if (weak.length) btns.append(mkBtn("Redo the " + weak.length + " that weren't green", "", () => startSpeak(deckId, 0, weak)));
+  btns.append(
               mkBtn("Back to overview", "ghost", () => go("home")));
   SP = null;
   go("sum");
@@ -1720,7 +1747,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") quitStudy();
 });
 
-const VERSION = "v27 · 2026-10-28";
+const VERSION = "v29 · 2026-10-28";
 $("version").textContent =
   VERSION + " — if you see something else here, your browser is still on the old page (reload).";
 $("rules").textContent =
